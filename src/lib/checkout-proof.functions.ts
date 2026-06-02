@@ -251,8 +251,9 @@ export const finalizeProofUpload = createServerFn({ method: "POST" })
     }
 
     // 5. Atomically transition subscription → pending_review.
-    const { error: updErr } = await supabaseAdmin
-      .from("subscriptions")
+    //    The DB enum gained 'pending_review' in PENDING_SQL_COMMANDS.sql
+    //    (Screen 21 block); cast through `any` until generated types refresh.
+    const { error: updErr } = await (supabaseAdmin.from("subscriptions") as any)
       .update({ status: "pending_review", updated_at: new Date().toISOString() })
       .eq("id", data.subscriptionId)
       .in("status", ["pending_payment", "pending_review"]);
