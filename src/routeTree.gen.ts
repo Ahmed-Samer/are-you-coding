@@ -9,38 +9,846 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PProductIdRouteImport } from './routes/p.$productId'
+import { Route as InviteAcceptRouteImport } from './routes/invite.accept'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard.index'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
+import { Route as ApiPublicErrorsRouteImport } from './routes/api/public/errors'
+import { Route as AuthenticatedStoreSlugRouteImport } from './routes/_authenticated/store.$slug'
+import { Route as AuthenticatedCheckoutSubscriptionIdRouteImport } from './routes/_authenticated/checkout.$subscriptionId'
+import { Route as AuthenticatedAdminWebhooksRouteImport } from './routes/_authenticated/admin.webhooks'
+import { Route as AuthenticatedAdminTenantsRouteImport } from './routes/_authenticated/admin.tenants'
+import { Route as AuthenticatedAdminPlansRouteImport } from './routes/_authenticated/admin.plans'
+import { Route as AuthenticatedAdminPaymentsRouteImport } from './routes/_authenticated/admin.payments'
+import { Route as AuthenticatedAdminPaymentMethodsRouteImport } from './routes/_authenticated/admin.payment-methods'
+import { Route as AuthenticatedAdminFxRatesRouteImport } from './routes/_authenticated/admin.fx-rates'
+import { Route as AuthenticatedAdminFlagsRouteImport } from './routes/_authenticated/admin.flags'
+import { Route as AuthenticatedAdminErrorsRouteImport } from './routes/_authenticated/admin.errors'
+import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
+import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
+import { Route as AuthenticatedAccountSecurityRouteImport } from './routes/_authenticated/account.security'
+import { Route as AuthenticatedStoreSlugIndexRouteImport } from './routes/_authenticated/store.$slug.index'
+import { Route as ApiPublicWebhooksWhatsappRouteImport } from './routes/api/public/webhooks/whatsapp'
+import { Route as ApiPublicCronWebhookDispatchRouteImport } from './routes/api/public/cron/webhook-dispatch'
+import { Route as ApiPublicCronVerifyDomainsRouteImport } from './routes/api/public/cron/verify-domains'
+import { Route as ApiPublicCronFxRatesRouteImport } from './routes/api/public/cron/fx-rates'
+import { Route as ApiPublicCronEmailFlushRouteImport } from './routes/api/public/cron/email-flush'
+import { Route as ApiPublicCronAbandonedCartsRouteImport } from './routes/api/public/cron/abandoned-carts'
+import { Route as AuthenticatedStoreSlugTeamRouteImport } from './routes/_authenticated/store.$slug.team'
+import { Route as AuthenticatedStoreSlugSettingsRouteImport } from './routes/_authenticated/store.$slug.settings'
+import { Route as AuthenticatedStoreSlugRecoveryRouteImport } from './routes/_authenticated/store.$slug.recovery'
+import { Route as AuthenticatedStoreSlugPromosRouteImport } from './routes/_authenticated/store.$slug.promos'
+import { Route as AuthenticatedStoreSlugProductsRouteImport } from './routes/_authenticated/store.$slug.products'
+import { Route as AuthenticatedStoreSlugOverviewRouteImport } from './routes/_authenticated/store.$slug.overview'
+import { Route as AuthenticatedStoreSlugOrdersRouteImport } from './routes/_authenticated/store.$slug.orders'
+import { Route as AuthenticatedStoreSlugDomainsRouteImport } from './routes/_authenticated/store.$slug.domains'
+import { Route as AuthenticatedStoreSlugCategoriesRouteImport } from './routes/_authenticated/store.$slug.categories'
+import { Route as AuthenticatedAdminTenantsTenantIdRouteImport } from './routes/_authenticated/admin.tenants.$tenantId'
+import { Route as AuthenticatedAdminBillingDunningRouteImport } from './routes/_authenticated/admin.billing.dunning'
+import { Route as ApiPublicStorefrontTenantSlugManifestRouteImport } from './routes/api/public/storefront/$tenantSlug.manifest'
+import { Route as ApiPublicStorefrontTenantSlugCatalogRouteImport } from './routes/api/public/storefront/$tenantSlug.catalog'
+import { Route as ApiPublicStorefrontTenantSlugProductProductIdRouteImport } from './routes/api/public/storefront/$tenantSlug.product.$productId'
+import { Route as ApiPublicStorefrontTenantSlugCategoryCategorySlugRouteImport } from './routes/api/public/storefront/$tenantSlug.category.$categorySlug'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplatesRoute = TemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PProductIdRoute = PProductIdRouteImport.update({
+  id: '/p/$productId',
+  path: '/p/$productId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteAcceptRoute = InviteAcceptRouteImport.update({
+  id: '/invite/accept',
+  path: '/invite/accept',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDashboardIndexRoute =
+  AuthenticatedDashboardIndexRouteImport.update({
+    id: '/dashboard/',
+    path: '/dashboard/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
+  id: '/api/public/health',
+  path: '/api/public/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicErrorsRoute = ApiPublicErrorsRouteImport.update({
+  id: '/api/public/errors',
+  path: '/api/public/errors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedStoreSlugRoute = AuthenticatedStoreSlugRouteImport.update({
+  id: '/store/$slug',
+  path: '/store/$slug',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCheckoutSubscriptionIdRoute =
+  AuthenticatedCheckoutSubscriptionIdRouteImport.update({
+    id: '/checkout/$subscriptionId',
+    path: '/checkout/$subscriptionId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminWebhooksRoute =
+  AuthenticatedAdminWebhooksRouteImport.update({
+    id: '/webhooks',
+    path: '/webhooks',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminTenantsRoute =
+  AuthenticatedAdminTenantsRouteImport.update({
+    id: '/tenants',
+    path: '/tenants',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPlansRoute = AuthenticatedAdminPlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminPaymentsRoute =
+  AuthenticatedAdminPaymentsRouteImport.update({
+    id: '/payments',
+    path: '/payments',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPaymentMethodsRoute =
+  AuthenticatedAdminPaymentMethodsRouteImport.update({
+    id: '/payment-methods',
+    path: '/payment-methods',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminFxRatesRoute =
+  AuthenticatedAdminFxRatesRouteImport.update({
+    id: '/fx-rates',
+    path: '/fx-rates',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminFlagsRoute = AuthenticatedAdminFlagsRouteImport.update({
+  id: '/flags',
+  path: '/flags',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminErrorsRoute =
+  AuthenticatedAdminErrorsRouteImport.update({
+    id: '/errors',
+    path: '/errors',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminAnalyticsRoute =
+  AuthenticatedAdminAnalyticsRouteImport.update({
+    id: '/analytics',
+    path: '/analytics',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAccountSecurityRoute =
+  AuthenticatedAccountSecurityRouteImport.update({
+    id: '/account/security',
+    path: '/account/security',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedStoreSlugIndexRoute =
+  AuthenticatedStoreSlugIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
+const ApiPublicWebhooksWhatsappRoute =
+  ApiPublicWebhooksWhatsappRouteImport.update({
+    id: '/api/public/webhooks/whatsapp',
+    path: '/api/public/webhooks/whatsapp',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCronWebhookDispatchRoute =
+  ApiPublicCronWebhookDispatchRouteImport.update({
+    id: '/api/public/cron/webhook-dispatch',
+    path: '/api/public/cron/webhook-dispatch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCronVerifyDomainsRoute =
+  ApiPublicCronVerifyDomainsRouteImport.update({
+    id: '/api/public/cron/verify-domains',
+    path: '/api/public/cron/verify-domains',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCronFxRatesRoute = ApiPublicCronFxRatesRouteImport.update({
+  id: '/api/public/cron/fx-rates',
+  path: '/api/public/cron/fx-rates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCronEmailFlushRoute = ApiPublicCronEmailFlushRouteImport.update({
+  id: '/api/public/cron/email-flush',
+  path: '/api/public/cron/email-flush',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCronAbandonedCartsRoute =
+  ApiPublicCronAbandonedCartsRouteImport.update({
+    id: '/api/public/cron/abandoned-carts',
+    path: '/api/public/cron/abandoned-carts',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AuthenticatedStoreSlugTeamRoute =
+  AuthenticatedStoreSlugTeamRouteImport.update({
+    id: '/team',
+    path: '/team',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
+const AuthenticatedStoreSlugSettingsRoute =
+  AuthenticatedStoreSlugSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
+const AuthenticatedStoreSlugRecoveryRoute =
+  AuthenticatedStoreSlugRecoveryRouteImport.update({
+    id: '/recovery',
+    path: '/recovery',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
+const AuthenticatedStoreSlugPromosRoute =
+  AuthenticatedStoreSlugPromosRouteImport.update({
+    id: '/promos',
+    path: '/promos',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
+const AuthenticatedStoreSlugProductsRoute =
+  AuthenticatedStoreSlugProductsRouteImport.update({
+    id: '/products',
+    path: '/products',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
+const AuthenticatedStoreSlugOverviewRoute =
+  AuthenticatedStoreSlugOverviewRouteImport.update({
+    id: '/overview',
+    path: '/overview',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
+const AuthenticatedStoreSlugOrdersRoute =
+  AuthenticatedStoreSlugOrdersRouteImport.update({
+    id: '/orders',
+    path: '/orders',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
+const AuthenticatedStoreSlugDomainsRoute =
+  AuthenticatedStoreSlugDomainsRouteImport.update({
+    id: '/domains',
+    path: '/domains',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
+const AuthenticatedStoreSlugCategoriesRoute =
+  AuthenticatedStoreSlugCategoriesRouteImport.update({
+    id: '/categories',
+    path: '/categories',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
+const AuthenticatedAdminTenantsTenantIdRoute =
+  AuthenticatedAdminTenantsTenantIdRouteImport.update({
+    id: '/$tenantId',
+    path: '/$tenantId',
+    getParentRoute: () => AuthenticatedAdminTenantsRoute,
+  } as any)
+const AuthenticatedAdminBillingDunningRoute =
+  AuthenticatedAdminBillingDunningRouteImport.update({
+    id: '/billing/dunning',
+    path: '/billing/dunning',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const ApiPublicStorefrontTenantSlugManifestRoute =
+  ApiPublicStorefrontTenantSlugManifestRouteImport.update({
+    id: '/api/public/storefront/$tenantSlug/manifest',
+    path: '/api/public/storefront/$tenantSlug/manifest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontTenantSlugCatalogRoute =
+  ApiPublicStorefrontTenantSlugCatalogRouteImport.update({
+    id: '/api/public/storefront/$tenantSlug/catalog',
+    path: '/api/public/storefront/$tenantSlug/catalog',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontTenantSlugProductProductIdRoute =
+  ApiPublicStorefrontTenantSlugProductProductIdRouteImport.update({
+    id: '/api/public/storefront/$tenantSlug/product/$productId',
+    path: '/api/public/storefront/$tenantSlug/product/$productId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontTenantSlugCategoryCategorySlugRoute =
+  ApiPublicStorefrontTenantSlugCategoryCategorySlugRouteImport.update({
+    id: '/api/public/storefront/$tenantSlug/category/$categorySlug',
+    path: '/api/public/storefront/$tenantSlug/category/$categorySlug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/templates': typeof TemplatesRoute
+  '/terms': typeof TermsRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/invite/accept': typeof InviteAcceptRoute
+  '/p/$productId': typeof PProductIdRoute
+  '/account/security': typeof AuthenticatedAccountSecurityRoute
+  '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
+  '/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/admin/errors': typeof AuthenticatedAdminErrorsRoute
+  '/admin/flags': typeof AuthenticatedAdminFlagsRoute
+  '/admin/fx-rates': typeof AuthenticatedAdminFxRatesRoute
+  '/admin/payment-methods': typeof AuthenticatedAdminPaymentMethodsRoute
+  '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
+  '/admin/plans': typeof AuthenticatedAdminPlansRoute
+  '/admin/tenants': typeof AuthenticatedAdminTenantsRouteWithChildren
+  '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
+  '/checkout/$subscriptionId': typeof AuthenticatedCheckoutSubscriptionIdRoute
+  '/store/$slug': typeof AuthenticatedStoreSlugRouteWithChildren
+  '/api/public/errors': typeof ApiPublicErrorsRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/admin/billing/dunning': typeof AuthenticatedAdminBillingDunningRoute
+  '/admin/tenants/$tenantId': typeof AuthenticatedAdminTenantsTenantIdRoute
+  '/store/$slug/categories': typeof AuthenticatedStoreSlugCategoriesRoute
+  '/store/$slug/domains': typeof AuthenticatedStoreSlugDomainsRoute
+  '/store/$slug/orders': typeof AuthenticatedStoreSlugOrdersRoute
+  '/store/$slug/overview': typeof AuthenticatedStoreSlugOverviewRoute
+  '/store/$slug/products': typeof AuthenticatedStoreSlugProductsRoute
+  '/store/$slug/promos': typeof AuthenticatedStoreSlugPromosRoute
+  '/store/$slug/recovery': typeof AuthenticatedStoreSlugRecoveryRoute
+  '/store/$slug/settings': typeof AuthenticatedStoreSlugSettingsRoute
+  '/store/$slug/team': typeof AuthenticatedStoreSlugTeamRoute
+  '/api/public/cron/abandoned-carts': typeof ApiPublicCronAbandonedCartsRoute
+  '/api/public/cron/email-flush': typeof ApiPublicCronEmailFlushRoute
+  '/api/public/cron/fx-rates': typeof ApiPublicCronFxRatesRoute
+  '/api/public/cron/verify-domains': typeof ApiPublicCronVerifyDomainsRoute
+  '/api/public/cron/webhook-dispatch': typeof ApiPublicCronWebhookDispatchRoute
+  '/api/public/webhooks/whatsapp': typeof ApiPublicWebhooksWhatsappRoute
+  '/store/$slug/': typeof AuthenticatedStoreSlugIndexRoute
+  '/api/public/storefront/$tenantSlug/catalog': typeof ApiPublicStorefrontTenantSlugCatalogRoute
+  '/api/public/storefront/$tenantSlug/manifest': typeof ApiPublicStorefrontTenantSlugManifestRoute
+  '/api/public/storefront/$tenantSlug/category/$categorySlug': typeof ApiPublicStorefrontTenantSlugCategoryCategorySlugRoute
+  '/api/public/storefront/$tenantSlug/product/$productId': typeof ApiPublicStorefrontTenantSlugProductProductIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/templates': typeof TemplatesRoute
+  '/terms': typeof TermsRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/invite/accept': typeof InviteAcceptRoute
+  '/p/$productId': typeof PProductIdRoute
+  '/account/security': typeof AuthenticatedAccountSecurityRoute
+  '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
+  '/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/admin/errors': typeof AuthenticatedAdminErrorsRoute
+  '/admin/flags': typeof AuthenticatedAdminFlagsRoute
+  '/admin/fx-rates': typeof AuthenticatedAdminFxRatesRoute
+  '/admin/payment-methods': typeof AuthenticatedAdminPaymentMethodsRoute
+  '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
+  '/admin/plans': typeof AuthenticatedAdminPlansRoute
+  '/admin/tenants': typeof AuthenticatedAdminTenantsRouteWithChildren
+  '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
+  '/checkout/$subscriptionId': typeof AuthenticatedCheckoutSubscriptionIdRoute
+  '/api/public/errors': typeof ApiPublicErrorsRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
+  '/dashboard': typeof AuthenticatedDashboardIndexRoute
+  '/admin/billing/dunning': typeof AuthenticatedAdminBillingDunningRoute
+  '/admin/tenants/$tenantId': typeof AuthenticatedAdminTenantsTenantIdRoute
+  '/store/$slug/categories': typeof AuthenticatedStoreSlugCategoriesRoute
+  '/store/$slug/domains': typeof AuthenticatedStoreSlugDomainsRoute
+  '/store/$slug/orders': typeof AuthenticatedStoreSlugOrdersRoute
+  '/store/$slug/overview': typeof AuthenticatedStoreSlugOverviewRoute
+  '/store/$slug/products': typeof AuthenticatedStoreSlugProductsRoute
+  '/store/$slug/promos': typeof AuthenticatedStoreSlugPromosRoute
+  '/store/$slug/recovery': typeof AuthenticatedStoreSlugRecoveryRoute
+  '/store/$slug/settings': typeof AuthenticatedStoreSlugSettingsRoute
+  '/store/$slug/team': typeof AuthenticatedStoreSlugTeamRoute
+  '/api/public/cron/abandoned-carts': typeof ApiPublicCronAbandonedCartsRoute
+  '/api/public/cron/email-flush': typeof ApiPublicCronEmailFlushRoute
+  '/api/public/cron/fx-rates': typeof ApiPublicCronFxRatesRoute
+  '/api/public/cron/verify-domains': typeof ApiPublicCronVerifyDomainsRoute
+  '/api/public/cron/webhook-dispatch': typeof ApiPublicCronWebhookDispatchRoute
+  '/api/public/webhooks/whatsapp': typeof ApiPublicWebhooksWhatsappRoute
+  '/store/$slug': typeof AuthenticatedStoreSlugIndexRoute
+  '/api/public/storefront/$tenantSlug/catalog': typeof ApiPublicStorefrontTenantSlugCatalogRoute
+  '/api/public/storefront/$tenantSlug/manifest': typeof ApiPublicStorefrontTenantSlugManifestRoute
+  '/api/public/storefront/$tenantSlug/category/$categorySlug': typeof ApiPublicStorefrontTenantSlugCategoryCategorySlugRoute
+  '/api/public/storefront/$tenantSlug/product/$productId': typeof ApiPublicStorefrontTenantSlugProductProductIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/templates': typeof TemplatesRoute
+  '/terms': typeof TermsRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/invite/accept': typeof InviteAcceptRoute
+  '/p/$productId': typeof PProductIdRoute
+  '/_authenticated/account/security': typeof AuthenticatedAccountSecurityRoute
+  '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
+  '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/_authenticated/admin/errors': typeof AuthenticatedAdminErrorsRoute
+  '/_authenticated/admin/flags': typeof AuthenticatedAdminFlagsRoute
+  '/_authenticated/admin/fx-rates': typeof AuthenticatedAdminFxRatesRoute
+  '/_authenticated/admin/payment-methods': typeof AuthenticatedAdminPaymentMethodsRoute
+  '/_authenticated/admin/payments': typeof AuthenticatedAdminPaymentsRoute
+  '/_authenticated/admin/plans': typeof AuthenticatedAdminPlansRoute
+  '/_authenticated/admin/tenants': typeof AuthenticatedAdminTenantsRouteWithChildren
+  '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
+  '/_authenticated/checkout/$subscriptionId': typeof AuthenticatedCheckoutSubscriptionIdRoute
+  '/_authenticated/store/$slug': typeof AuthenticatedStoreSlugRouteWithChildren
+  '/api/public/errors': typeof ApiPublicErrorsRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/_authenticated/admin/billing/dunning': typeof AuthenticatedAdminBillingDunningRoute
+  '/_authenticated/admin/tenants/$tenantId': typeof AuthenticatedAdminTenantsTenantIdRoute
+  '/_authenticated/store/$slug/categories': typeof AuthenticatedStoreSlugCategoriesRoute
+  '/_authenticated/store/$slug/domains': typeof AuthenticatedStoreSlugDomainsRoute
+  '/_authenticated/store/$slug/orders': typeof AuthenticatedStoreSlugOrdersRoute
+  '/_authenticated/store/$slug/overview': typeof AuthenticatedStoreSlugOverviewRoute
+  '/_authenticated/store/$slug/products': typeof AuthenticatedStoreSlugProductsRoute
+  '/_authenticated/store/$slug/promos': typeof AuthenticatedStoreSlugPromosRoute
+  '/_authenticated/store/$slug/recovery': typeof AuthenticatedStoreSlugRecoveryRoute
+  '/_authenticated/store/$slug/settings': typeof AuthenticatedStoreSlugSettingsRoute
+  '/_authenticated/store/$slug/team': typeof AuthenticatedStoreSlugTeamRoute
+  '/api/public/cron/abandoned-carts': typeof ApiPublicCronAbandonedCartsRoute
+  '/api/public/cron/email-flush': typeof ApiPublicCronEmailFlushRoute
+  '/api/public/cron/fx-rates': typeof ApiPublicCronFxRatesRoute
+  '/api/public/cron/verify-domains': typeof ApiPublicCronVerifyDomainsRoute
+  '/api/public/cron/webhook-dispatch': typeof ApiPublicCronWebhookDispatchRoute
+  '/api/public/webhooks/whatsapp': typeof ApiPublicWebhooksWhatsappRoute
+  '/_authenticated/store/$slug/': typeof AuthenticatedStoreSlugIndexRoute
+  '/api/public/storefront/$tenantSlug/catalog': typeof ApiPublicStorefrontTenantSlugCatalogRoute
+  '/api/public/storefront/$tenantSlug/manifest': typeof ApiPublicStorefrontTenantSlugManifestRoute
+  '/api/public/storefront/$tenantSlug/category/$categorySlug': typeof ApiPublicStorefrontTenantSlugCategoryCategorySlugRoute
+  '/api/public/storefront/$tenantSlug/product/$productId': typeof ApiPublicStorefrontTenantSlugProductProductIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/contact'
+    | '/forgot-password'
+    | '/login'
+    | '/pricing'
+    | '/privacy'
+    | '/reset-password'
+    | '/signup'
+    | '/sitemap.xml'
+    | '/templates'
+    | '/terms'
+    | '/admin'
+    | '/onboarding'
+    | '/auth/callback'
+    | '/invite/accept'
+    | '/p/$productId'
+    | '/account/security'
+    | '/admin/analytics'
+    | '/admin/audit'
+    | '/admin/errors'
+    | '/admin/flags'
+    | '/admin/fx-rates'
+    | '/admin/payment-methods'
+    | '/admin/payments'
+    | '/admin/plans'
+    | '/admin/tenants'
+    | '/admin/webhooks'
+    | '/checkout/$subscriptionId'
+    | '/store/$slug'
+    | '/api/public/errors'
+    | '/api/public/health'
+    | '/admin/'
+    | '/dashboard/'
+    | '/admin/billing/dunning'
+    | '/admin/tenants/$tenantId'
+    | '/store/$slug/categories'
+    | '/store/$slug/domains'
+    | '/store/$slug/orders'
+    | '/store/$slug/overview'
+    | '/store/$slug/products'
+    | '/store/$slug/promos'
+    | '/store/$slug/recovery'
+    | '/store/$slug/settings'
+    | '/store/$slug/team'
+    | '/api/public/cron/abandoned-carts'
+    | '/api/public/cron/email-flush'
+    | '/api/public/cron/fx-rates'
+    | '/api/public/cron/verify-domains'
+    | '/api/public/cron/webhook-dispatch'
+    | '/api/public/webhooks/whatsapp'
+    | '/store/$slug/'
+    | '/api/public/storefront/$tenantSlug/catalog'
+    | '/api/public/storefront/$tenantSlug/manifest'
+    | '/api/public/storefront/$tenantSlug/category/$categorySlug'
+    | '/api/public/storefront/$tenantSlug/product/$productId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/about'
+    | '/contact'
+    | '/forgot-password'
+    | '/login'
+    | '/pricing'
+    | '/privacy'
+    | '/reset-password'
+    | '/signup'
+    | '/sitemap.xml'
+    | '/templates'
+    | '/terms'
+    | '/onboarding'
+    | '/auth/callback'
+    | '/invite/accept'
+    | '/p/$productId'
+    | '/account/security'
+    | '/admin/analytics'
+    | '/admin/audit'
+    | '/admin/errors'
+    | '/admin/flags'
+    | '/admin/fx-rates'
+    | '/admin/payment-methods'
+    | '/admin/payments'
+    | '/admin/plans'
+    | '/admin/tenants'
+    | '/admin/webhooks'
+    | '/checkout/$subscriptionId'
+    | '/api/public/errors'
+    | '/api/public/health'
+    | '/admin'
+    | '/dashboard'
+    | '/admin/billing/dunning'
+    | '/admin/tenants/$tenantId'
+    | '/store/$slug/categories'
+    | '/store/$slug/domains'
+    | '/store/$slug/orders'
+    | '/store/$slug/overview'
+    | '/store/$slug/products'
+    | '/store/$slug/promos'
+    | '/store/$slug/recovery'
+    | '/store/$slug/settings'
+    | '/store/$slug/team'
+    | '/api/public/cron/abandoned-carts'
+    | '/api/public/cron/email-flush'
+    | '/api/public/cron/fx-rates'
+    | '/api/public/cron/verify-domains'
+    | '/api/public/cron/webhook-dispatch'
+    | '/api/public/webhooks/whatsapp'
+    | '/store/$slug'
+    | '/api/public/storefront/$tenantSlug/catalog'
+    | '/api/public/storefront/$tenantSlug/manifest'
+    | '/api/public/storefront/$tenantSlug/category/$categorySlug'
+    | '/api/public/storefront/$tenantSlug/product/$productId'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/about'
+    | '/contact'
+    | '/forgot-password'
+    | '/login'
+    | '/pricing'
+    | '/privacy'
+    | '/reset-password'
+    | '/signup'
+    | '/sitemap.xml'
+    | '/templates'
+    | '/terms'
+    | '/_authenticated/admin'
+    | '/_authenticated/onboarding'
+    | '/auth/callback'
+    | '/invite/accept'
+    | '/p/$productId'
+    | '/_authenticated/account/security'
+    | '/_authenticated/admin/analytics'
+    | '/_authenticated/admin/audit'
+    | '/_authenticated/admin/errors'
+    | '/_authenticated/admin/flags'
+    | '/_authenticated/admin/fx-rates'
+    | '/_authenticated/admin/payment-methods'
+    | '/_authenticated/admin/payments'
+    | '/_authenticated/admin/plans'
+    | '/_authenticated/admin/tenants'
+    | '/_authenticated/admin/webhooks'
+    | '/_authenticated/checkout/$subscriptionId'
+    | '/_authenticated/store/$slug'
+    | '/api/public/errors'
+    | '/api/public/health'
+    | '/_authenticated/admin/'
+    | '/_authenticated/dashboard/'
+    | '/_authenticated/admin/billing/dunning'
+    | '/_authenticated/admin/tenants/$tenantId'
+    | '/_authenticated/store/$slug/categories'
+    | '/_authenticated/store/$slug/domains'
+    | '/_authenticated/store/$slug/orders'
+    | '/_authenticated/store/$slug/overview'
+    | '/_authenticated/store/$slug/products'
+    | '/_authenticated/store/$slug/promos'
+    | '/_authenticated/store/$slug/recovery'
+    | '/_authenticated/store/$slug/settings'
+    | '/_authenticated/store/$slug/team'
+    | '/api/public/cron/abandoned-carts'
+    | '/api/public/cron/email-flush'
+    | '/api/public/cron/fx-rates'
+    | '/api/public/cron/verify-domains'
+    | '/api/public/cron/webhook-dispatch'
+    | '/api/public/webhooks/whatsapp'
+    | '/_authenticated/store/$slug/'
+    | '/api/public/storefront/$tenantSlug/catalog'
+    | '/api/public/storefront/$tenantSlug/manifest'
+    | '/api/public/storefront/$tenantSlug/category/$categorySlug'
+    | '/api/public/storefront/$tenantSlug/product/$productId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  AboutRoute: typeof AboutRoute
+  ContactRoute: typeof ContactRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
+  LoginRoute: typeof LoginRoute
+  PricingRoute: typeof PricingRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  SignupRoute: typeof SignupRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TemplatesRoute: typeof TemplatesRoute
+  TermsRoute: typeof TermsRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  InviteAcceptRoute: typeof InviteAcceptRoute
+  PProductIdRoute: typeof PProductIdRoute
+  ApiPublicErrorsRoute: typeof ApiPublicErrorsRoute
+  ApiPublicHealthRoute: typeof ApiPublicHealthRoute
+  ApiPublicCronAbandonedCartsRoute: typeof ApiPublicCronAbandonedCartsRoute
+  ApiPublicCronEmailFlushRoute: typeof ApiPublicCronEmailFlushRoute
+  ApiPublicCronFxRatesRoute: typeof ApiPublicCronFxRatesRoute
+  ApiPublicCronVerifyDomainsRoute: typeof ApiPublicCronVerifyDomainsRoute
+  ApiPublicCronWebhookDispatchRoute: typeof ApiPublicCronWebhookDispatchRoute
+  ApiPublicWebhooksWhatsappRoute: typeof ApiPublicWebhooksWhatsappRoute
+  ApiPublicStorefrontTenantSlugCatalogRoute: typeof ApiPublicStorefrontTenantSlugCatalogRoute
+  ApiPublicStorefrontTenantSlugManifestRoute: typeof ApiPublicStorefrontTenantSlugManifestRoute
+  ApiPublicStorefrontTenantSlugCategoryCategorySlugRoute: typeof ApiPublicStorefrontTenantSlugCategoryCategorySlugRoute
+  ApiPublicStorefrontTenantSlugProductProductIdRoute: typeof ApiPublicStorefrontTenantSlugProductProductIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates': {
+      id: '/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +856,455 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$productId': {
+      id: '/p/$productId'
+      path: '/p/$productId'
+      fullPath: '/p/$productId'
+      preLoaderRoute: typeof PProductIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/accept': {
+      id: '/invite/accept'
+      path: '/invite/accept'
+      fullPath: '/invite/accept'
+      preLoaderRoute: typeof InviteAcceptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard/': {
+      id: '/_authenticated/dashboard/'
+      path: '/dashboard'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof AuthenticatedDashboardIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/public/health': {
+      id: '/api/public/health'
+      path: '/api/public/health'
+      fullPath: '/api/public/health'
+      preLoaderRoute: typeof ApiPublicHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/errors': {
+      id: '/api/public/errors'
+      path: '/api/public/errors'
+      fullPath: '/api/public/errors'
+      preLoaderRoute: typeof ApiPublicErrorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/store/$slug': {
+      id: '/_authenticated/store/$slug'
+      path: '/store/$slug'
+      fullPath: '/store/$slug'
+      preLoaderRoute: typeof AuthenticatedStoreSlugRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/checkout/$subscriptionId': {
+      id: '/_authenticated/checkout/$subscriptionId'
+      path: '/checkout/$subscriptionId'
+      fullPath: '/checkout/$subscriptionId'
+      preLoaderRoute: typeof AuthenticatedCheckoutSubscriptionIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/webhooks': {
+      id: '/_authenticated/admin/webhooks'
+      path: '/webhooks'
+      fullPath: '/admin/webhooks'
+      preLoaderRoute: typeof AuthenticatedAdminWebhooksRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/tenants': {
+      id: '/_authenticated/admin/tenants'
+      path: '/tenants'
+      fullPath: '/admin/tenants'
+      preLoaderRoute: typeof AuthenticatedAdminTenantsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/plans': {
+      id: '/_authenticated/admin/plans'
+      path: '/plans'
+      fullPath: '/admin/plans'
+      preLoaderRoute: typeof AuthenticatedAdminPlansRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/payments': {
+      id: '/_authenticated/admin/payments'
+      path: '/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AuthenticatedAdminPaymentsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/payment-methods': {
+      id: '/_authenticated/admin/payment-methods'
+      path: '/payment-methods'
+      fullPath: '/admin/payment-methods'
+      preLoaderRoute: typeof AuthenticatedAdminPaymentMethodsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/fx-rates': {
+      id: '/_authenticated/admin/fx-rates'
+      path: '/fx-rates'
+      fullPath: '/admin/fx-rates'
+      preLoaderRoute: typeof AuthenticatedAdminFxRatesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/flags': {
+      id: '/_authenticated/admin/flags'
+      path: '/flags'
+      fullPath: '/admin/flags'
+      preLoaderRoute: typeof AuthenticatedAdminFlagsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/errors': {
+      id: '/_authenticated/admin/errors'
+      path: '/errors'
+      fullPath: '/admin/errors'
+      preLoaderRoute: typeof AuthenticatedAdminErrorsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/audit': {
+      id: '/_authenticated/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AuthenticatedAdminAuditRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/analytics': {
+      id: '/_authenticated/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AuthenticatedAdminAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/account/security': {
+      id: '/_authenticated/account/security'
+      path: '/account/security'
+      fullPath: '/account/security'
+      preLoaderRoute: typeof AuthenticatedAccountSecurityRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/store/$slug/': {
+      id: '/_authenticated/store/$slug/'
+      path: '/'
+      fullPath: '/store/$slug/'
+      preLoaderRoute: typeof AuthenticatedStoreSlugIndexRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
+    '/api/public/webhooks/whatsapp': {
+      id: '/api/public/webhooks/whatsapp'
+      path: '/api/public/webhooks/whatsapp'
+      fullPath: '/api/public/webhooks/whatsapp'
+      preLoaderRoute: typeof ApiPublicWebhooksWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/webhook-dispatch': {
+      id: '/api/public/cron/webhook-dispatch'
+      path: '/api/public/cron/webhook-dispatch'
+      fullPath: '/api/public/cron/webhook-dispatch'
+      preLoaderRoute: typeof ApiPublicCronWebhookDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/verify-domains': {
+      id: '/api/public/cron/verify-domains'
+      path: '/api/public/cron/verify-domains'
+      fullPath: '/api/public/cron/verify-domains'
+      preLoaderRoute: typeof ApiPublicCronVerifyDomainsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/fx-rates': {
+      id: '/api/public/cron/fx-rates'
+      path: '/api/public/cron/fx-rates'
+      fullPath: '/api/public/cron/fx-rates'
+      preLoaderRoute: typeof ApiPublicCronFxRatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/email-flush': {
+      id: '/api/public/cron/email-flush'
+      path: '/api/public/cron/email-flush'
+      fullPath: '/api/public/cron/email-flush'
+      preLoaderRoute: typeof ApiPublicCronEmailFlushRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/abandoned-carts': {
+      id: '/api/public/cron/abandoned-carts'
+      path: '/api/public/cron/abandoned-carts'
+      fullPath: '/api/public/cron/abandoned-carts'
+      preLoaderRoute: typeof ApiPublicCronAbandonedCartsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/store/$slug/team': {
+      id: '/_authenticated/store/$slug/team'
+      path: '/team'
+      fullPath: '/store/$slug/team'
+      preLoaderRoute: typeof AuthenticatedStoreSlugTeamRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
+    '/_authenticated/store/$slug/settings': {
+      id: '/_authenticated/store/$slug/settings'
+      path: '/settings'
+      fullPath: '/store/$slug/settings'
+      preLoaderRoute: typeof AuthenticatedStoreSlugSettingsRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
+    '/_authenticated/store/$slug/recovery': {
+      id: '/_authenticated/store/$slug/recovery'
+      path: '/recovery'
+      fullPath: '/store/$slug/recovery'
+      preLoaderRoute: typeof AuthenticatedStoreSlugRecoveryRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
+    '/_authenticated/store/$slug/promos': {
+      id: '/_authenticated/store/$slug/promos'
+      path: '/promos'
+      fullPath: '/store/$slug/promos'
+      preLoaderRoute: typeof AuthenticatedStoreSlugPromosRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
+    '/_authenticated/store/$slug/products': {
+      id: '/_authenticated/store/$slug/products'
+      path: '/products'
+      fullPath: '/store/$slug/products'
+      preLoaderRoute: typeof AuthenticatedStoreSlugProductsRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
+    '/_authenticated/store/$slug/overview': {
+      id: '/_authenticated/store/$slug/overview'
+      path: '/overview'
+      fullPath: '/store/$slug/overview'
+      preLoaderRoute: typeof AuthenticatedStoreSlugOverviewRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
+    '/_authenticated/store/$slug/orders': {
+      id: '/_authenticated/store/$slug/orders'
+      path: '/orders'
+      fullPath: '/store/$slug/orders'
+      preLoaderRoute: typeof AuthenticatedStoreSlugOrdersRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
+    '/_authenticated/store/$slug/domains': {
+      id: '/_authenticated/store/$slug/domains'
+      path: '/domains'
+      fullPath: '/store/$slug/domains'
+      preLoaderRoute: typeof AuthenticatedStoreSlugDomainsRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
+    '/_authenticated/store/$slug/categories': {
+      id: '/_authenticated/store/$slug/categories'
+      path: '/categories'
+      fullPath: '/store/$slug/categories'
+      preLoaderRoute: typeof AuthenticatedStoreSlugCategoriesRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
+    '/_authenticated/admin/tenants/$tenantId': {
+      id: '/_authenticated/admin/tenants/$tenantId'
+      path: '/$tenantId'
+      fullPath: '/admin/tenants/$tenantId'
+      preLoaderRoute: typeof AuthenticatedAdminTenantsTenantIdRouteImport
+      parentRoute: typeof AuthenticatedAdminTenantsRoute
+    }
+    '/_authenticated/admin/billing/dunning': {
+      id: '/_authenticated/admin/billing/dunning'
+      path: '/billing/dunning'
+      fullPath: '/admin/billing/dunning'
+      preLoaderRoute: typeof AuthenticatedAdminBillingDunningRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/public/storefront/$tenantSlug/manifest': {
+      id: '/api/public/storefront/$tenantSlug/manifest'
+      path: '/api/public/storefront/$tenantSlug/manifest'
+      fullPath: '/api/public/storefront/$tenantSlug/manifest'
+      preLoaderRoute: typeof ApiPublicStorefrontTenantSlugManifestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/$tenantSlug/catalog': {
+      id: '/api/public/storefront/$tenantSlug/catalog'
+      path: '/api/public/storefront/$tenantSlug/catalog'
+      fullPath: '/api/public/storefront/$tenantSlug/catalog'
+      preLoaderRoute: typeof ApiPublicStorefrontTenantSlugCatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/$tenantSlug/product/$productId': {
+      id: '/api/public/storefront/$tenantSlug/product/$productId'
+      path: '/api/public/storefront/$tenantSlug/product/$productId'
+      fullPath: '/api/public/storefront/$tenantSlug/product/$productId'
+      preLoaderRoute: typeof ApiPublicStorefrontTenantSlugProductProductIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/$tenantSlug/category/$categorySlug': {
+      id: '/api/public/storefront/$tenantSlug/category/$categorySlug'
+      path: '/api/public/storefront/$tenantSlug/category/$categorySlug'
+      fullPath: '/api/public/storefront/$tenantSlug/category/$categorySlug'
+      preLoaderRoute: typeof ApiPublicStorefrontTenantSlugCategoryCategorySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AuthenticatedAdminTenantsRouteChildren {
+  AuthenticatedAdminTenantsTenantIdRoute: typeof AuthenticatedAdminTenantsTenantIdRoute
+}
+
+const AuthenticatedAdminTenantsRouteChildren: AuthenticatedAdminTenantsRouteChildren =
+  {
+    AuthenticatedAdminTenantsTenantIdRoute:
+      AuthenticatedAdminTenantsTenantIdRoute,
+  }
+
+const AuthenticatedAdminTenantsRouteWithChildren =
+  AuthenticatedAdminTenantsRoute._addFileChildren(
+    AuthenticatedAdminTenantsRouteChildren,
+  )
+
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAnalyticsRoute: typeof AuthenticatedAdminAnalyticsRoute
+  AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
+  AuthenticatedAdminErrorsRoute: typeof AuthenticatedAdminErrorsRoute
+  AuthenticatedAdminFlagsRoute: typeof AuthenticatedAdminFlagsRoute
+  AuthenticatedAdminFxRatesRoute: typeof AuthenticatedAdminFxRatesRoute
+  AuthenticatedAdminPaymentMethodsRoute: typeof AuthenticatedAdminPaymentMethodsRoute
+  AuthenticatedAdminPaymentsRoute: typeof AuthenticatedAdminPaymentsRoute
+  AuthenticatedAdminPlansRoute: typeof AuthenticatedAdminPlansRoute
+  AuthenticatedAdminTenantsRoute: typeof AuthenticatedAdminTenantsRouteWithChildren
+  AuthenticatedAdminWebhooksRoute: typeof AuthenticatedAdminWebhooksRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+  AuthenticatedAdminBillingDunningRoute: typeof AuthenticatedAdminBillingDunningRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAnalyticsRoute: AuthenticatedAdminAnalyticsRoute,
+  AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
+  AuthenticatedAdminErrorsRoute: AuthenticatedAdminErrorsRoute,
+  AuthenticatedAdminFlagsRoute: AuthenticatedAdminFlagsRoute,
+  AuthenticatedAdminFxRatesRoute: AuthenticatedAdminFxRatesRoute,
+  AuthenticatedAdminPaymentMethodsRoute: AuthenticatedAdminPaymentMethodsRoute,
+  AuthenticatedAdminPaymentsRoute: AuthenticatedAdminPaymentsRoute,
+  AuthenticatedAdminPlansRoute: AuthenticatedAdminPlansRoute,
+  AuthenticatedAdminTenantsRoute: AuthenticatedAdminTenantsRouteWithChildren,
+  AuthenticatedAdminWebhooksRoute: AuthenticatedAdminWebhooksRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+  AuthenticatedAdminBillingDunningRoute: AuthenticatedAdminBillingDunningRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
+
+interface AuthenticatedStoreSlugRouteChildren {
+  AuthenticatedStoreSlugCategoriesRoute: typeof AuthenticatedStoreSlugCategoriesRoute
+  AuthenticatedStoreSlugDomainsRoute: typeof AuthenticatedStoreSlugDomainsRoute
+  AuthenticatedStoreSlugOrdersRoute: typeof AuthenticatedStoreSlugOrdersRoute
+  AuthenticatedStoreSlugOverviewRoute: typeof AuthenticatedStoreSlugOverviewRoute
+  AuthenticatedStoreSlugProductsRoute: typeof AuthenticatedStoreSlugProductsRoute
+  AuthenticatedStoreSlugPromosRoute: typeof AuthenticatedStoreSlugPromosRoute
+  AuthenticatedStoreSlugRecoveryRoute: typeof AuthenticatedStoreSlugRecoveryRoute
+  AuthenticatedStoreSlugSettingsRoute: typeof AuthenticatedStoreSlugSettingsRoute
+  AuthenticatedStoreSlugTeamRoute: typeof AuthenticatedStoreSlugTeamRoute
+  AuthenticatedStoreSlugIndexRoute: typeof AuthenticatedStoreSlugIndexRoute
+}
+
+const AuthenticatedStoreSlugRouteChildren: AuthenticatedStoreSlugRouteChildren =
+  {
+    AuthenticatedStoreSlugCategoriesRoute:
+      AuthenticatedStoreSlugCategoriesRoute,
+    AuthenticatedStoreSlugDomainsRoute: AuthenticatedStoreSlugDomainsRoute,
+    AuthenticatedStoreSlugOrdersRoute: AuthenticatedStoreSlugOrdersRoute,
+    AuthenticatedStoreSlugOverviewRoute: AuthenticatedStoreSlugOverviewRoute,
+    AuthenticatedStoreSlugProductsRoute: AuthenticatedStoreSlugProductsRoute,
+    AuthenticatedStoreSlugPromosRoute: AuthenticatedStoreSlugPromosRoute,
+    AuthenticatedStoreSlugRecoveryRoute: AuthenticatedStoreSlugRecoveryRoute,
+    AuthenticatedStoreSlugSettingsRoute: AuthenticatedStoreSlugSettingsRoute,
+    AuthenticatedStoreSlugTeamRoute: AuthenticatedStoreSlugTeamRoute,
+    AuthenticatedStoreSlugIndexRoute: AuthenticatedStoreSlugIndexRoute,
+  }
+
+const AuthenticatedStoreSlugRouteWithChildren =
+  AuthenticatedStoreSlugRoute._addFileChildren(
+    AuthenticatedStoreSlugRouteChildren,
+  )
+
+interface AuthenticatedRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedAccountSecurityRoute: typeof AuthenticatedAccountSecurityRoute
+  AuthenticatedCheckoutSubscriptionIdRoute: typeof AuthenticatedCheckoutSubscriptionIdRoute
+  AuthenticatedStoreSlugRoute: typeof AuthenticatedStoreSlugRouteWithChildren
+  AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedAccountSecurityRoute: AuthenticatedAccountSecurityRoute,
+  AuthenticatedCheckoutSubscriptionIdRoute:
+    AuthenticatedCheckoutSubscriptionIdRoute,
+  AuthenticatedStoreSlugRoute: AuthenticatedStoreSlugRouteWithChildren,
+  AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  AboutRoute: AboutRoute,
+  ContactRoute: ContactRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
+  LoginRoute: LoginRoute,
+  PricingRoute: PricingRoute,
+  PrivacyRoute: PrivacyRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  SignupRoute: SignupRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TemplatesRoute: TemplatesRoute,
+  TermsRoute: TermsRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  InviteAcceptRoute: InviteAcceptRoute,
+  PProductIdRoute: PProductIdRoute,
+  ApiPublicErrorsRoute: ApiPublicErrorsRoute,
+  ApiPublicHealthRoute: ApiPublicHealthRoute,
+  ApiPublicCronAbandonedCartsRoute: ApiPublicCronAbandonedCartsRoute,
+  ApiPublicCronEmailFlushRoute: ApiPublicCronEmailFlushRoute,
+  ApiPublicCronFxRatesRoute: ApiPublicCronFxRatesRoute,
+  ApiPublicCronVerifyDomainsRoute: ApiPublicCronVerifyDomainsRoute,
+  ApiPublicCronWebhookDispatchRoute: ApiPublicCronWebhookDispatchRoute,
+  ApiPublicWebhooksWhatsappRoute: ApiPublicWebhooksWhatsappRoute,
+  ApiPublicStorefrontTenantSlugCatalogRoute:
+    ApiPublicStorefrontTenantSlugCatalogRoute,
+  ApiPublicStorefrontTenantSlugManifestRoute:
+    ApiPublicStorefrontTenantSlugManifestRoute,
+  ApiPublicStorefrontTenantSlugCategoryCategorySlugRoute:
+    ApiPublicStorefrontTenantSlugCategoryCategorySlugRoute,
+  ApiPublicStorefrontTenantSlugProductProductIdRoute:
+    ApiPublicStorefrontTenantSlugProductProductIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

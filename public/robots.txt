@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Keep authenticated app and APIs out of search indexes
+Disallow: /dashboard
+Disallow: /onboarding
+Disallow: /checkout
+Disallow: /admin
+Disallow: /store
+Disallow: /api/
