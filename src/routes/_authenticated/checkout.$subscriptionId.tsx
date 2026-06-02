@@ -22,6 +22,8 @@ import {
 } from "@/lib/billing.functions";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { formatMoney } from "@/lib/format-price";
+import { UploadProofStep } from "@/components/checkout/UploadProofStep";
+import { createProofUploadUrl, finalizeProofUpload } from "@/lib/checkout-proof.functions";
 
 const ONBOARDING_DRAFT_KEY = "coreweb:onboarding:draft:v4";
 
@@ -192,6 +194,8 @@ export function CheckoutPage() {
   const cancelSub = useServerFn(cancelPendingSubscription);
   const supersede = useServerFn(supersedePendingProof);
   const resendEmail = useServerFn(resendBankInstructionsEmail);
+  const requestUploadUrl = useServerFn(createProofUploadUrl);
+  const finalizeUpload = useServerFn(finalizeProofUpload);
 
   const { data: checkout, isLoading, error: checkoutError, refetch: refetchCheckout } = useQuery({
     queryKey: ["checkout", subscriptionId],
@@ -909,82 +913,47 @@ export function CheckoutPage() {
 
 
             {step === "proof" && (
-              <form onSubmit={onRequestSubmit} className="space-y-5">
-                <div>
-                  <h2 className="text-lg font-semibold">Submit your proof</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Enter the transaction reference shown in your bank or wallet app.
-                  </p>
-                </div>
-                {latestProofStatus === "rejected" && (
-                  <div
-                    role="alert"
-                    className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
-                  >
-                    <p className="font-medium text-destructive">Your previous proof was rejected</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Please double-check your transaction reference and resubmit.
-                    </p>
-                  </div>
-                )}
-                <div className="rounded-md border border-border p-3 text-xs text-muted-foreground">
-                  Paying with <span className="text-foreground font-medium">{selectedMethod?.label}</span> ·
-                  Amount <span className="text-foreground font-medium">{egpLabel}</span> ({fmtUsd(usd)})
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ref">Transaction reference / SMS code</Label>
-                  <Input id="ref" required minLength={3} maxLength={80} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. 982341" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes (optional)</Label>
-                  <Textarea id="notes" maxLength={500} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Sender name, time of transfer, etc." />
-                </div>
-                <div className="space-y-2">
-                  <Label>Receipt screenshot (optional)</Label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,application/pdf"
-                    className="sr-only"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] ?? null;
-                      if (f && f.size > 5 * 1024 * 1024) {
-                        toast.error("Max file size is 5 MB.");
-                        return;
-                      }
-                      setFile(f);
-                    }}
-                  />
-                  {file ? (
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
-                      <span className="truncate text-foreground">{file.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                        className="text-muted-foreground hover:text-foreground"
-                        aria-label="Remove file"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-4 text-xs text-muted-foreground hover:bg-accent/40 transition-colors"
-                    >
-                      <Upload className="size-4" />
-                      Upload screenshot (PNG, JPG, WebP, PDF · max 5MB)
-                    </button>
-                  )}
-                </div>
-                <div className="flex justify-between">
-                  <Button type="button" variant="ghost" onClick={() => goTo("instructions")}>Back</Button>
-                  <Button type="submit" disabled={busy}>
-                    {uploading ? "Uploading…" : busy ? "Submitting…" : "Submit for review"}
-                  </Button>
-                </div>
-              </form>
+              <UploadProofStep
+                referenceCode={referenceCode}
+                selectedMethodLabel={selectedMethod?.label ?? null}
+                selectedMethodId={methodId || null}
+                amountLabel={egpLabel}
+                usdLabel={fmtUsd(usd)}
+                initialReference={reference}
+                initialNotes={notes}
+                showRejectedNotice={latestProofStatus === "rejected"}
+                onBack={() => goTo("instructions")}
+                onRequestUploadUrl={async ({ contentType, byteSize }) => {
+                  const res: any = await requestUploadUrl({
+                    data: { subscriptionId, contentType, byteSize },
+                  });
+                  return { uploadUrl: res.uploadUrl, storagePath: res.storagePath };
+                }}
+                onFinalize={async (input) => {
+                  await finalizeUpload({
+                    data: {
+                      subscriptionId,
+                      storagePath: input.storagePath,
+                      declaredContentType: input.declaredContentType,
+                      paymentMethodId: input.paymentMethodId,
+                      referenceNumber: input.referenceNumber,
+                      notes: input.notes,
+                    },
+                  });
+                  await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ["checkout", subscriptionId] }),
+                    queryClient.invalidateQueries({ queryKey: ["my-tenants"] }),
+                    queryClient.invalidateQueries({ queryKey: ["my-tenants-stats"] }),
+                  ]);
+                }}
+                onSuccess={() => {
+                  toast.success("Proof submitted — we'll review within 24 hours.");
+                  setReference("");
+                  setNotes("");
+                  setFile(null);
+                  goTo("pending");
+                }}
+              />
             )}
 
             {step === "pending" && (

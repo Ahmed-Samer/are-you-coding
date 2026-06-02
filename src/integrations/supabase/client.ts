@@ -7,6 +7,7 @@ const SUPABASE_URL =
   (typeof process !== 'undefined' ? process.env.SUPABASE_URL : undefined);
 const SUPABASE_PUBLISHABLE_KEY =
   (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ??
+  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ??
   (typeof process !== 'undefined' ? process.env.SUPABASE_PUBLISHABLE_KEY : undefined);
 
 function createSupabaseClient() {
