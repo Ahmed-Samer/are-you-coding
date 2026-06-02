@@ -656,3 +656,30 @@ create trigger subscriptions_set_reference
 -- storm.
 alter table public.subscriptions
   add column if not exists instructions_email_sent_at timestamptz;
+
+-- ============================================================================
+-- Group 03 · Screen 21 — Checkout Upload Proof
+-- ----------------------------------------------------------------------------
+-- Adds the 'pending_review' value to the subscription_status enum so the
+-- finalizeProofUpload server fn can atomically advance a subscription from
+-- 'pending_payment' once a proof has been persisted + MIME-sniffed.
+-- Postgres requires the ALTER TYPE to commit BEFORE the new value can be
+-- USED; run this statement on its own first, then the rest of the block.
+-- ============================================================================
+
+alter type public.subscription_status add value if not exists 'pending_review';
+
+-- The Storage bucket `payment-proofs` and its tenant-scoped RLS policies
+-- (insert/select keyed on `(storage.foldername(name))[1] = tenants.id`)
+-- ship with migration 20260529061839. No bucket-policy changes required
+-- here — the server-minted signed-upload-URL flow writes to the same
+-- `{tenant_id}/{subscription_id}/proof-<ts>.<ext>` path convention.
+
+-- ----------------------------------------------------------------------------
+-- Operator note (no DDL): audit_log entries for proof submission are written
+-- by src/lib/checkout-proof.functions.ts via writeAuditLog with
+--   action      = 'proof.submitted'
+--   target_table = 'payment_proofs'
+--   diff        = { storage_path, mime, byte_size, sha256, amount_usd, ... }
+-- which uses the existing public.audit_logs table created in the admin
+-- foundation migration. No new audit columns are required.

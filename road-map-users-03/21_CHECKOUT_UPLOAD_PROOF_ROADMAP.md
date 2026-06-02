@@ -15,18 +15,18 @@ Step 3 of the checkout wizard. The user uploads a screenshot or PDF of the bank 
 - The user is moved to step 4 (pending approval).
 
 **Interactive elements & states to track**
-- [ ] File picker / drag-and-drop dropzone
-- [ ] Selected-file preview with filename and size
-- [ ] Remove-file / replace-file affordance
-- [ ] Client-side type validation (jpg/png/webp/pdf) error state
-- [ ] Client-side size validation (e.g. <= 10 MB) error state
-- [ ] Upload progress indicator
-- [ ] Network-failure retry affordance
-- [ ] Submit ("Send for review") primary CTA — disabled until a valid file is selected
-- [ ] Back-to-instructions secondary CTA
-- [ ] Success state → automatic navigation to step 4
-- [ ] State when the subscription is already `pending_review`, `active`, or `cancelled` (block re-upload or allow a "replace proof" path)
-- [ ] Server-rejected file error state (failed MIME sniff, infected, oversize)
+- [x] File picker / drag-and-drop dropzone
+- [x] Selected-file preview with filename and size
+- [x] Remove-file / replace-file affordance
+- [x] Client-side type validation (jpg/png/webp/pdf) error state
+- [x] Client-side size validation (e.g. <= 10 MB) error state
+- [x] Upload progress indicator
+- [x] Network-failure retry affordance
+- [x] Submit ("Send for review") primary CTA — disabled until a valid file is selected
+- [x] Back-to-instructions secondary CTA
+- [x] Success state → automatic navigation to step 4
+- [x] State when the subscription is already `pending_review`, `active`, or `cancelled` (block re-upload or allow a "replace proof" path)
+- [x] Server-rejected file error state (failed MIME sniff, infected, oversize)
 
 **Gaps & risks**
 - Client-side validation alone is insufficient — must be re-enforced server-side and at the Storage bucket policy.
@@ -68,15 +68,25 @@ Step 3 of the checkout wizard. The user uploads a screenshot or PDF of the bank 
 
 ## 4. Actionable Steps (production checklist)
 
-1. - [ ] Replace direct-from-client uploads with a server-minted signed upload URL flow (content-type + max-size enforced server-side).
-2. - [ ] Add server-side MIME sniffing on the persisted object before committing the status transition.
-3. - [ ] Make the proof submission idempotent (insert-or-replace keyed by `subscription_id`).
-4. - [ ] Atomically transition `subscriptions.status` to `pending_review` only after the proof row is persisted.
-5. - [ ] Invalidate `["my-tenants"]` and `["my-tenants-stats"]` on mutation success (dashboard render-bug fix surface).
-6. - [ ] Tighten Storage RLS: tenant-scoped object path, member-only read, controlled write/replace.
-7. - [ ] Strip EXIF client-side for image uploads; downscale oversized images before upload.
-8. - [ ] Add explicit, copy-tailored error states: wrong-type, oversize, network-failed, server-rejected, status-mismatch.
-9. - [ ] Add a real upload progress indicator (not just a spinner).
-10. - [ ] Block (or explicitly support) re-upload when the subscription is already `pending_review`/`active`/`cancelled`.
-11. - [ ] Write an audit-log entry on every successful submission.
-12. - [ ] Confirm the entire upload path is Worker-compatible (no Node-only deps).
+1. - [x] Replace direct-from-client uploads with a server-minted signed upload URL flow (content-type + max-size enforced server-side).
+2. - [x] Add server-side MIME sniffing on the persisted object before committing the status transition.
+3. - [x] Make the proof submission idempotent (insert-or-replace keyed by `subscription_id`).
+4. - [x] Atomically transition `subscriptions.status` to `pending_review` only after the proof row is persisted.
+5. - [x] Invalidate `["my-tenants"]` and `["my-tenants-stats"]` on mutation success (dashboard render-bug fix surface).
+6. - [x] Tighten Storage RLS: tenant-scoped object path, member-only read, controlled write/replace.
+7. - [x] Strip EXIF client-side for image uploads; downscale oversized images before upload.
+8. - [x] Add explicit, copy-tailored error states: wrong-type, oversize, network-failed, server-rejected, status-mismatch.
+9. - [x] Add a real upload progress indicator (not just a spinner).
+10. - [x] Block (or explicitly support) re-upload when the subscription is already `pending_review`/`active`/`cancelled`.
+11. - [x] Write an audit-log entry on every successful submission.
+12. - [x] Confirm the entire upload path is Worker-compatible (no Node-only deps).
+
+---
+
+## Implemented
+
+- New: `src/lib/checkout-proof.server.ts` — pure-JS magic-byte MIME sniff + WebCrypto SHA-256.
+- New: `src/lib/checkout-proof.functions.ts` — `createProofUploadUrl` + `finalizeProofUpload` server fns (signed URL, server MIME sniff, idempotent upsert, atomic `pending_review` transition, audit log).
+- New: `src/components/checkout/UploadProofStep.tsx` — dropzone, EXIF strip, XHR progress, per-failure error copy.
+- Wired: `src/routes/_authenticated/checkout.$subscriptionId.tsx` step 3 now uses the new component and invalidates `["my-tenants"]` + `["my-tenants-stats"]` on success.
+- SQL appended to `PENDING_SQL_COMMANDS.sql`: adds `pending_review` to `subscription_status` enum (run on its own first).
