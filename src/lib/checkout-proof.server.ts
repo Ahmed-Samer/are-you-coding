@@ -78,7 +78,11 @@ export const MAX_PROOF_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /** Hex SHA-256 via WebCrypto — Worker-safe. */
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", bytes);
+  // Copy into a fresh ArrayBuffer to satisfy strict BufferSource typing
+  // (Uint8Array<ArrayBufferLike> may be backed by SharedArrayBuffer).
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  const buf = await crypto.subtle.digest("SHA-256", copy.buffer);
   const view = new Uint8Array(buf);
   let out = "";
   for (let i = 0; i < view.length; i++) {
