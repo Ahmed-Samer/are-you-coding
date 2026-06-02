@@ -22,6 +22,8 @@ import {
 } from "@/lib/billing.functions";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { formatMoney } from "@/lib/format-price";
+import { UploadProofStep } from "@/components/checkout/UploadProofStep";
+import { createProofUploadUrl, finalizeProofUpload } from "@/lib/checkout-proof.functions";
 
 const ONBOARDING_DRAFT_KEY = "coreweb:onboarding:draft:v4";
 
@@ -192,6 +194,8 @@ export function CheckoutPage() {
   const cancelSub = useServerFn(cancelPendingSubscription);
   const supersede = useServerFn(supersedePendingProof);
   const resendEmail = useServerFn(resendBankInstructionsEmail);
+  const requestUploadUrl = useServerFn(createProofUploadUrl);
+  const finalizeUpload = useServerFn(finalizeProofUpload);
 
   const { data: checkout, isLoading, error: checkoutError, refetch: refetchCheckout } = useQuery({
     queryKey: ["checkout", subscriptionId],
