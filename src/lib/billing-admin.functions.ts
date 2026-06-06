@@ -47,6 +47,25 @@ async function insertAdjustment(input: {
   externalReference?: string | null;
   actorId: string;
 }) {
+  // Pre-validate the FK target so we fail with a readable message instead of
+  // an opaque "billing_adjustments_subscription_id_fkey" Postgres error.
+  // This catches the "legacy FK still pointing at public.subscriptions" class
+  // of bug AND the simple typo case (id doesn't exist anymore).
+  if (input.accountSubscriptionId) {
+    const { data: subRow, error: subErr } = await sb
+      .from("account_subscriptions")
+      .select("id")
+      .eq("id", input.accountSubscriptionId)
+      .maybeSingle();
+    if (subErr) throw new Error(subErr.message);
+    if (!subRow) {
+      throw new Error(
+        `Cannot record billing adjustment: account subscription ${input.accountSubscriptionId} not found. ` +
+          `If you just upgraded the schema, verify billing_adjustments.subscription_id_fkey now references public.account_subscriptions.`,
+      );
+    }
+  }
+
   const { data, error } = await sb
     .from("billing_adjustments")
     .insert({
