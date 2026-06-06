@@ -116,7 +116,7 @@ export function AdminTenantsPage() {
   useEffect(() => {
     const t = setTimeout(() => {
       if (localQuery !== searchParams.q) {
-        navigate({ search: (s) => ({ ...s, q: localQuery || undefined, page: 1 }) });
+        navigate({ search: (s: any) => ({ ...s, q: localQuery || undefined, page: 1 }) });
       }
     }, 400);
     return () => clearTimeout(t);
@@ -188,7 +188,7 @@ export function AdminTenantsPage() {
             {TABS.map((t) => (
               <button
                 key={t.key}
-                onClick={() => navigate({ search: (s) => ({ ...s, status: t.key, page: 1 }) })}
+                onClick={() => navigate({ search: (s: any) => ({ ...s, status: t.key, page: 1 }) })}
                 className={
                   "px-3 h-7 text-xs rounded inline-flex items-center gap-1.5 transition-colors " +
                   (searchParams.status === t.key 
@@ -326,7 +326,7 @@ export function AdminTenantsPage() {
                 variant="outline"
                 size="sm"
                 disabled={searchParams.page <= 1}
-                onClick={() => navigate({ search: (s) => ({ ...s, page: s.page - 1 }) })}
+                onClick={() => navigate({ search: (s: any) => ({ ...s, page: s.page - 1 }) })}
               >
                 Previous
               </Button>
@@ -334,7 +334,7 @@ export function AdminTenantsPage() {
                 variant="outline"
                 size="sm"
                 disabled={searchParams.page * 25 >= total}
-                onClick={() => navigate({ search: (s) => ({ ...s, page: s.page + 1 }) })}
+                onClick={() => navigate({ search: (s: any) => ({ ...s, page: s.page + 1 }) })}
               >
                 Next
               </Button>
