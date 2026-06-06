@@ -88,7 +88,7 @@ export function AdminAuditPage() {
   useEffect(() => {
     const t = setTimeout(() => {
       navigate({
-        search: (s) => ({
+        search: (s: any) => ({
           ...s,
           actorId: actorIdInput || undefined,
           targetTable: targetTableInput || undefined,
@@ -232,7 +232,7 @@ export function AdminAuditPage() {
                 variant="outline"
                 size="sm"
                 disabled={searchParams.page <= 1}
-                onClick={() => navigate({ search: (s) => ({ ...s, page: s.page - 1 }) })}
+                onClick={() => navigate({ search: (s: any) => ({ ...s, page: s.page - 1 }) })}
               >
                 Previous
               </Button>
@@ -240,7 +240,7 @@ export function AdminAuditPage() {
                 variant="outline"
                 size="sm"
                 disabled={searchParams.page * 50 >= total}
-                onClick={() => navigate({ search: (s) => ({ ...s, page: s.page + 1 }) })}
+                onClick={() => navigate({ search: (s: any) => ({ ...s, page: s.page + 1 }) })}
               >
                 Next
               </Button>

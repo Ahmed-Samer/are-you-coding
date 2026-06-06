@@ -99,7 +99,7 @@ export function AdminPaymentsPage() {
   useEffect(() => {
     const t = setTimeout(() => {
       if (localQuery !== searchParams.q) {
-        navigate({ search: (s) => ({ ...s, q: localQuery || undefined, page: 1 }) });
+        navigate({ search: (s: any) => ({ ...s, q: localQuery || undefined, page: 1 }) });
       }
     }, 400);
     return () => clearTimeout(t);
@@ -167,7 +167,7 @@ export function AdminPaymentsPage() {
               <button
                 key={t.key}
                 onClick={() => {
-                  navigate({ search: (s) => ({ ...s, status: t.key, page: 1 }) });
+                  navigate({ search: (s: any) => ({ ...s, status: t.key, page: 1 }) });
                   setSelected(new Set());
                 }}
                 className={
@@ -287,7 +287,7 @@ export function AdminPaymentsPage() {
                 variant="outline"
                 size="sm"
                 disabled={searchParams.page <= 1}
-                onClick={() => navigate({ search: (s) => ({ ...s, page: s.page - 1 }) })}
+                onClick={() => navigate({ search: (s: any) => ({ ...s, page: s.page - 1 }) })}
               >
                 Previous
               </Button>
@@ -295,7 +295,7 @@ export function AdminPaymentsPage() {
                 variant="outline"
                 size="sm"
                 disabled={searchParams.page * 25 >= total}
-                onClick={() => navigate({ search: (s) => ({ ...s, page: s.page + 1 }) })}
+                onClick={() => navigate({ search: (s: any) => ({ ...s, page: s.page + 1 }) })}
               >
                 Next
               </Button>

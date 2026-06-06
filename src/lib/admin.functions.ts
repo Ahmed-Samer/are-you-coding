@@ -923,3 +923,85 @@ export const getAdminDashboardKPIs = createServerFn({ method: "GET" })
       revenueTimeline,
     };
   });
+
+// =====================================================================
+// runKillSwitchBackfill — one-shot recovery for orphaned active tenants
+// =====================================================================
+//
+// Scans account_subscriptions for users whose ONLY non-terminal subscription
+// is in (`cancelled`,`expired`) and forces all of their `active` tenants into
+// `suspended`. Idempotent — safe to run repeatedly.
+//
+// Use after deploying the kill-switch DB trigger to clean up historical
+// accounts that were cancelled before the trigger existed.
+
+export const runKillSwitchBackfill = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+
+    // 1. Find every owner with at least one cancelled/expired sub.
+    const { data: deadSubs, error: dErr } = await sb
+      .from("account_subscriptions")
+      .select("user_id, status")
+      .in("status", ["cancelled", "expired"]);
+    if (dErr) throw new Error(dErr.message);
+
+    const candidateUserIds = Array.from(
+      new Set((deadSubs ?? []).map((r: any) => r.user_id as string)),
+    );
+    if (candidateUserIds.length === 0) {
+      return { ok: true, scanned: 0, usersAffected: 0, tenantsSuspended: 0 };
+    }
+
+    // 2. Filter to users with NO active subscription left.
+    const { data: activeRows, error: aErr } = await sb
+      .from("account_subscriptions")
+      .select("user_id")
+      .in("user_id", candidateUserIds)
+      .eq("status", "active");
+    if (aErr) throw new Error(aErr.message);
+    const stillActive = new Set((activeRows ?? []).map((r: any) => r.user_id as string));
+    const orphanedUserIds = candidateUserIds.filter((u) => !stillActive.has(u));
+
+    if (orphanedUserIds.length === 0) {
+      return {
+        ok: true,
+        scanned: candidateUserIds.length,
+        usersAffected: 0,
+        tenantsSuspended: 0,
+      };
+    }
+
+    // 3. Suspend in bulk.
+    const nowIso = new Date().toISOString();
+    const { data: suspended, error: uErr } = await sb
+      .from("tenants")
+      .update({
+        status: "suspended",
+        suspended_at: nowIso,
+        suspended_reason: "kill_switch_backfill",
+      })
+      .in("owner_id", orphanedUserIds)
+      .eq("status", "active")
+      .select("id, owner_id");
+    if (uErr) throw new Error(uErr.message);
+
+    const tenantsSuspended = Array.isArray(suspended) ? suspended.length : 0;
+    const usersAffected = new Set(
+      (suspended ?? []).map((r: any) => r.owner_id as string),
+    ).size;
+
+    await audit(context.userId, "kill_switch.backfill", "tenants", null, {
+      scanned: candidateUserIds.length,
+      orphaned_users: orphanedUserIds.length,
+      tenants_suspended: tenantsSuspended,
+    });
+
+    return {
+      ok: true,
+      scanned: candidateUserIds.length,
+      usersAffected,
+      tenantsSuspended,
+    };
+  });

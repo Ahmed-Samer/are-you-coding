@@ -4,7 +4,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PlatformShell } from "@/components/shells/PlatformShell";
-import { getMyTenants, cancelPendingSubscription, getMyAccountSubscription } from "@/lib/billing.functions";
+import {
+  getMyTenants,
+  cancelPendingSubscription,
+  getMyAccountSubscription,
+  getMyPendingSubscription,
+} from "@/lib/billing.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -35,6 +40,7 @@ function DashboardPage() {
   const fetcher = useServerFn(getMyTenants);
   const cancelFn = useServerFn(cancelPendingSubscription);
   const accountSubFn = useServerFn(getMyAccountSubscription);
+  const pendingSubFn = useServerFn(getMyPendingSubscription);
   const qc = useQueryClient();
 
   const { data, isLoading, error: fetchError, refetch } = useQuery({
@@ -54,10 +60,19 @@ function DashboardPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const cancelMut = useMutation({
-    mutationFn: (subscriptionId: string) => cancelFn({ data: { subscriptionId } }),
+    // The id the UI hands us may be stale. Re-fetch the pending-only id
+    // right before the cancel call so we can NEVER nuke an active subscription.
+    mutationFn: async (_subscriptionId: string) => {
+      const { subscription: pendingSub } = await pendingSubFn();
+      if (!pendingSub?.id) {
+        throw new Error("No pending checkout to cancel.");
+      }
+      return cancelFn({ data: { subscriptionId: pendingSub.id } });
+    },
     onSuccess: () => {
       toast.success("Checkout cancelled");
       qc.invalidateQueries({ queryKey: ["my-tenants"] });
+      qc.invalidateQueries({ queryKey: ["my-account-subscription"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

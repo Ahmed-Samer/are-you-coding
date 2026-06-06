@@ -828,24 +828,25 @@ export const cancelPendingSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ subscriptionId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { data: sub, error: sErr } = await (supabaseAdmin as any)
-      .from("account_subscriptions" as any)
-      .select("id, status, user_id")
-      .eq("id", data.subscriptionId)
-      .single();
-    if (sErr || !sub) throw new Error("Subscription not found");
-    if (sub.user_id !== context.userId) throw new Error("Forbidden");
-    
-    if (sub.status !== "pending_payment" && (sub.status as string) !== "pending_review") {
-      throw new Error("Only pending checkouts can be cancelled.");
-    }
-
-    const { error } = await (supabaseAdmin as any)
+    // Atomic, status-scoped cancel. The status filter is part of the WHERE
+    // clause itself so we can never accidentally cancel an `active` row even
+    // if the caller passes a stale/wrong id. Ownership is enforced the same
+    // way. We rely on the row count to detect "nothing matched".
+    const { data: rows, error } = await (supabaseAdmin as any)
       .from("account_subscriptions" as any)
       .update({ status: "cancelled" })
-      .eq("id", data.subscriptionId);
+      .eq("id", data.subscriptionId)
+      .eq("user_id", context.userId)
+      .in("status", ["pending_payment", "pending_review"])
+      .select("id");
     if (error) throw new Error(error.message);
-    return { ok: true };
+    const cancelled = Array.isArray(rows) ? rows.length : 0;
+    if (cancelled === 0) {
+      throw new Error(
+        "Only pending checkouts can be cancelled. This subscription is no longer pending or does not belong to you.",
+      );
+    }
+    return { ok: true, cancelled };
   });
 
 // ---------- SUPERSEDE pending proof (edit/resend) ----------
@@ -875,4 +876,107 @@ export const supersedePendingProof = createServerFn({ method: "POST" })
       .eq("id", data.subscriptionId);
 
     return { ok: true };
+  });
+
+// ---------- READ: pending-only subscription (used by cancel UI) ----------
+//
+// Returns ONLY the row whose status is `pending_payment` or `pending_review`.
+// Callers that drive a "cancel pending" affordance MUST source the id from
+// here — never from `getMyAccountSubscription`, which returns the latest row
+// regardless of status and can race against a freshly-created pending row.
+
+export const getMyPendingSubscription = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await (supabaseAdmin as any)
+      .from("account_subscriptions" as any)
+      .select("id, status, plan_id, created_at")
+      .eq("user_id", context.userId)
+      .in("status", ["pending_payment", "pending_review"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { subscription: data ?? null };
+  });
+
+// ---------- KILL-SWITCH: manual tenant suspension ----------
+//
+// Mirrors the `suspend_account_tenants` DB trigger for cases where we need to
+// run the suspension imperatively (admin recovery, historical backfill, or
+// environments that haven't picked up the trigger yet). Idempotent.
+//
+// Authorization: the caller must either be an admin OR be the owner of the
+// targeted user's tenants. We re-check ownership server-side.
+
+export const suspendAccountTenants = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        userId: z.string().uuid().optional(),
+        accountSubscriptionId: z.string().uuid().optional(),
+        reason: z.string().trim().min(3).max(120).default("account_subscription_cancelled"),
+      })
+      .refine((v) => v.userId || v.accountSubscriptionId, {
+        message: "Provide userId or accountSubscriptionId",
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = supabaseAdmin as any;
+
+    // Resolve target user id.
+    let targetUserId = data.userId ?? null;
+    if (!targetUserId && data.accountSubscriptionId) {
+      const { data: sub, error: sErr } = await sb
+        .from("account_subscriptions")
+        .select("user_id")
+        .eq("id", data.accountSubscriptionId)
+        .maybeSingle();
+      if (sErr) throw new Error(sErr.message);
+      if (!sub) throw new Error("Subscription not found");
+      targetUserId = sub.user_id as string;
+    }
+    if (!targetUserId) throw new Error("Could not resolve target user");
+
+    // Authorization: self OR admin.
+    if (targetUserId !== context.userId) {
+      const { data: roleRow, error: rErr } = await sb
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", context.userId)
+        .eq("role", "admin")
+        .maybeSingle();
+      if (rErr) throw new Error(rErr.message);
+      if (!roleRow) throw new Error("Forbidden");
+    }
+
+    // Guard: do NOT suspend if the user still has an active account subscription.
+    const { data: activeRow, error: aErr } = await sb
+      .from("account_subscriptions")
+      .select("id")
+      .eq("user_id", targetUserId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+    if (aErr) throw new Error(aErr.message);
+    if (activeRow) {
+      return { ok: true, suspended: 0, reason: "user_has_active_subscription" };
+    }
+
+    const nowIso = new Date().toISOString();
+    const { data: rows, error: uErr } = await sb
+      .from("tenants")
+      .update({
+        status: "suspended",
+        suspended_at: nowIso,
+        suspended_reason: data.reason,
+      })
+      .eq("owner_id", targetUserId)
+      .eq("status", "active")
+      .select("id");
+    if (uErr) throw new Error(uErr.message);
+
+    return { ok: true, suspended: Array.isArray(rows) ? rows.length : 0 };
   });
