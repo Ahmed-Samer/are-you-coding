@@ -1,48 +1,11 @@
 /**
  * Single source of truth for storefront templates.
  * Used by /templates (marketing) and /onboarding (wizard).
- *
- * --------------------------------------------------------------------------
- * FUTURE MIGRATION PATH — Supabase-backed templates registry
- * --------------------------------------------------------------------------
- * If/when templates become content-managed instead of code-shipped, migrate
- * this static array to a `public.templates` table read at the edge with a
- * short TTL (5–15 min) module cache, mirroring the pattern used by
- * `listPlans` in src/lib/billing.functions.ts.
- *
- * Proposed schema (mirrors TemplateDef below):
- *   create table public.templates (
- *     slug text primary key,
- *     name text not null,
- *     description text not null,
- *     audience text not null,
- *     available boolean not null default true,
- *     coming_soon_note text,
- *     preview_image text,        -- public CDN URL
- *     preview_image_alt text,
- *     og_image text,             -- defaults to preview_image at read time
- *     sort_order int not null default 0,
- *     created_at timestamptz not null default now()
- *   );
- *
- * Grants + RLS (public, anon-readable, server-managed writes):
- *   grant select on public.templates to anon, authenticated;
- *   grant all on public.templates to service_role;
- *   alter table public.templates enable row level security;
- *   create policy "public read templates"
- *     on public.templates for select to anon, authenticated using (true);
- *
- * Only safe, public columns are exposed. Build assets (HTML/CSS bundles per
- * template) stay in code or in a separate storage bucket; this table is the
- * catalog, not the renderer.
- * --------------------------------------------------------------------------
  */
 
-import atelierPreview from "@/assets/templates/atelier.jpg";
-import marketPreview from "@/assets/templates/market.jpg";
-import boutiquePreview from "@/assets/templates/boutique.jpg";
+import classicPreview from "@/assets/templates/atelier.jpg"; // Using existing image as mockup for Classic
 
-export type TemplateSlug = "atelier" | "market" | "boutique" | "concierge";
+export type TemplateSlug = "classic" | "minimal" | "boutique" | "market" | "luxe" | "sport";
 
 export type TemplateDef = {
   slug: TemplateSlug;
@@ -58,43 +21,50 @@ export type TemplateDef = {
 
 export const TEMPLATES: TemplateDef[] = [
   {
-    slug: "atelier",
-    name: "Atelier",
-    description: "Minimal, editorial retail.",
-    audience: "Boutique apparel, design studios",
+    slug: "classic",
+    name: "Classic",
+    description: "The essential Generic Storefront for retail and marketplaces. Fast, flexible, and conversion-optimized.",
+    audience: "Retail, E-commerce, Marketplaces",
     available: true,
-    previewImage: atelierPreview,
-    previewImageAlt: "Atelier template — editorial storefront with serif wordmark and minimal product grid",
-    ogImage: atelierPreview,
+    previewImage: classicPreview,
+    previewImageAlt: "Classic template — the essential high-performance storefront",
+    ogImage: classicPreview,
   },
   {
-    slug: "market",
-    name: "Market",
-    description: "Dense grid for large catalogs.",
-    audience: "Grocery, pharmacy, supplies",
+    slug: "minimal",
+    name: "Minimal",
+    description: "Clean, distraction-free design focusing entirely on your products with generous whitespace.",
+    audience: "Artisans, Single-product stores, Tech gadgets",
     available: true,
-    previewImage: marketPreview,
-    previewImageAlt: "Market template — dense product grid with category chips for large catalogs",
-    ogImage: marketPreview,
   },
   {
     slug: "boutique",
     name: "Boutique",
-    description: "Premium feel for small collections.",
-    audience: "Jewelry, perfumery, gifting",
+    description: "Elegant serif typography and refined spacing, perfect for high-end fashion and lifestyle brands.",
+    audience: "Fashion, Jewelry, Beauty, Lifestyle",
     available: true,
-    previewImage: boutiquePreview,
-    previewImageAlt: "Boutique template — premium product hero with warm tones for small collections",
-    ogImage: boutiquePreview,
   },
   {
-    slug: "concierge",
-    name: "Concierge",
-    description: "Booking-first layout for service businesses.",
-    audience: "Salons, clinics, studios",
-    available: false,
-    comingSoonNote: "In design — expected next release.",
+    slug: "market",
+    name: "Market",
+    description: "Dense, structured grid layout designed to handle large product catalogs and complex categories.",
+    audience: "Wholesale, Groceries, Electronics, Large Catalogs",
+    available: true,
   },
+  {
+    slug: "luxe",
+    name: "Luxe",
+    description: "A dark-mode focused, premium aesthetic that screams luxury and exclusivity.",
+    audience: "Luxury watches, High-end fashion, Premium services",
+    available: true,
+  },
+  {
+    slug: "sport",
+    name: "Sport",
+    description: "Bold typography, dynamic angles, and high contrast designed to drive action and energy.",
+    audience: "Fitness, Streetwear, Supplements, Action Sports",
+    available: true,
+  }
 ];
 
 export function getTemplate(slug: string): TemplateDef | undefined {
@@ -105,12 +75,6 @@ export function getAvailableTemplates(): TemplateDef[] {
   return TEMPLATES.filter((t) => t.available);
 }
 
-/**
- * True only when the slug exists in the registry AND is marked available.
- * Used by both the wizard (gate Continue + confirm revalidation) and the
- * server (createTenantAndSubscription) so a tampered draft can't persist
- * an unavailable template.
- */
 export function isTemplateSelectable(slug: string): boolean {
   const t = getTemplate(slug);
   return !!t && t.available;

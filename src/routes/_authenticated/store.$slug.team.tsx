@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Mail, Trash2, UserPlus, Users, Clock } from "lucide-react";
-import { useStore } from "./store.$slug";
+import { useStore } from "@/lib/store-context";
 import { useUser } from "@/lib/auth-context";
 import {
   listTenantMembers,

@@ -26,6 +26,7 @@ import { Route as PProductIdRouteImport } from './routes/p.$productId'
 import { Route as InviteAcceptRouteImport } from './routes/invite.accept'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedNewStoreRouteImport } from './routes/_authenticated/new-store'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
@@ -52,6 +53,7 @@ import { Route as ApiPublicCronFxRatesRouteImport } from './routes/api/public/cr
 import { Route as ApiPublicCronEmailFlushRouteImport } from './routes/api/public/cron/email-flush'
 import { Route as ApiPublicCronAbandonedCartsRouteImport } from './routes/api/public/cron/abandoned-carts'
 import { Route as AuthenticatedStoreSlugTeamRouteImport } from './routes/_authenticated/store.$slug.team'
+import { Route as AuthenticatedStoreSlugShippingRouteImport } from './routes/_authenticated/store.$slug.shipping'
 import { Route as AuthenticatedStoreSlugSettingsRouteImport } from './routes/_authenticated/store.$slug.settings'
 import { Route as AuthenticatedStoreSlugRecoveryRouteImport } from './routes/_authenticated/store.$slug.recovery'
 import { Route as AuthenticatedStoreSlugPromosRouteImport } from './routes/_authenticated/store.$slug.promos'
@@ -149,6 +151,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedNewStoreRoute = AuthenticatedNewStoreRouteImport.update({
+  id: '/new-store',
+  path: '/new-store',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -297,6 +304,12 @@ const AuthenticatedStoreSlugTeamRoute =
     path: '/team',
     getParentRoute: () => AuthenticatedStoreSlugRoute,
   } as any)
+const AuthenticatedStoreSlugShippingRoute =
+  AuthenticatedStoreSlugShippingRouteImport.update({
+    id: '/shipping',
+    path: '/shipping',
+    getParentRoute: () => AuthenticatedStoreSlugRoute,
+  } as any)
 const AuthenticatedStoreSlugSettingsRoute =
   AuthenticatedStoreSlugSettingsRouteImport.update({
     id: '/settings',
@@ -396,6 +409,7 @@ export interface FileRoutesByFullPath {
   '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/new-store': typeof AuthenticatedNewStoreRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/invite/accept': typeof InviteAcceptRoute
@@ -427,6 +441,7 @@ export interface FileRoutesByFullPath {
   '/store/$slug/promos': typeof AuthenticatedStoreSlugPromosRoute
   '/store/$slug/recovery': typeof AuthenticatedStoreSlugRecoveryRoute
   '/store/$slug/settings': typeof AuthenticatedStoreSlugSettingsRoute
+  '/store/$slug/shipping': typeof AuthenticatedStoreSlugShippingRoute
   '/store/$slug/team': typeof AuthenticatedStoreSlugTeamRoute
   '/api/public/cron/abandoned-carts': typeof ApiPublicCronAbandonedCartsRoute
   '/api/public/cron/email-flush': typeof ApiPublicCronEmailFlushRoute
@@ -453,6 +468,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
+  '/new-store': typeof AuthenticatedNewStoreRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/invite/accept': typeof InviteAcceptRoute
@@ -483,6 +499,7 @@ export interface FileRoutesByTo {
   '/store/$slug/promos': typeof AuthenticatedStoreSlugPromosRoute
   '/store/$slug/recovery': typeof AuthenticatedStoreSlugRecoveryRoute
   '/store/$slug/settings': typeof AuthenticatedStoreSlugSettingsRoute
+  '/store/$slug/shipping': typeof AuthenticatedStoreSlugShippingRoute
   '/store/$slug/team': typeof AuthenticatedStoreSlugTeamRoute
   '/api/public/cron/abandoned-carts': typeof ApiPublicCronAbandonedCartsRoute
   '/api/public/cron/email-flush': typeof ApiPublicCronEmailFlushRoute
@@ -512,6 +529,7 @@ export interface FileRoutesById {
   '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/new-store': typeof AuthenticatedNewStoreRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/invite/accept': typeof InviteAcceptRoute
@@ -543,6 +561,7 @@ export interface FileRoutesById {
   '/_authenticated/store/$slug/promos': typeof AuthenticatedStoreSlugPromosRoute
   '/_authenticated/store/$slug/recovery': typeof AuthenticatedStoreSlugRecoveryRoute
   '/_authenticated/store/$slug/settings': typeof AuthenticatedStoreSlugSettingsRoute
+  '/_authenticated/store/$slug/shipping': typeof AuthenticatedStoreSlugShippingRoute
   '/_authenticated/store/$slug/team': typeof AuthenticatedStoreSlugTeamRoute
   '/api/public/cron/abandoned-carts': typeof ApiPublicCronAbandonedCartsRoute
   '/api/public/cron/email-flush': typeof ApiPublicCronEmailFlushRoute
@@ -572,6 +591,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/terms'
     | '/admin'
+    | '/new-store'
     | '/onboarding'
     | '/auth/callback'
     | '/invite/accept'
@@ -603,6 +623,7 @@ export interface FileRouteTypes {
     | '/store/$slug/promos'
     | '/store/$slug/recovery'
     | '/store/$slug/settings'
+    | '/store/$slug/shipping'
     | '/store/$slug/team'
     | '/api/public/cron/abandoned-carts'
     | '/api/public/cron/email-flush'
@@ -629,6 +650,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/templates'
     | '/terms'
+    | '/new-store'
     | '/onboarding'
     | '/auth/callback'
     | '/invite/accept'
@@ -659,6 +681,7 @@ export interface FileRouteTypes {
     | '/store/$slug/promos'
     | '/store/$slug/recovery'
     | '/store/$slug/settings'
+    | '/store/$slug/shipping'
     | '/store/$slug/team'
     | '/api/public/cron/abandoned-carts'
     | '/api/public/cron/email-flush'
@@ -687,6 +710,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/terms'
     | '/_authenticated/admin'
+    | '/_authenticated/new-store'
     | '/_authenticated/onboarding'
     | '/auth/callback'
     | '/invite/accept'
@@ -718,6 +742,7 @@ export interface FileRouteTypes {
     | '/_authenticated/store/$slug/promos'
     | '/_authenticated/store/$slug/recovery'
     | '/_authenticated/store/$slug/settings'
+    | '/_authenticated/store/$slug/shipping'
     | '/_authenticated/store/$slug/team'
     | '/api/public/cron/abandoned-carts'
     | '/api/public/cron/email-flush'
@@ -882,6 +907,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/new-store': {
+      id: '/_authenticated/new-store'
+      path: '/new-store'
+      fullPath: '/new-store'
+      preLoaderRoute: typeof AuthenticatedNewStoreRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin': {
@@ -1066,6 +1098,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedStoreSlugTeamRouteImport
       parentRoute: typeof AuthenticatedStoreSlugRoute
     }
+    '/_authenticated/store/$slug/shipping': {
+      id: '/_authenticated/store/$slug/shipping'
+      path: '/shipping'
+      fullPath: '/store/$slug/shipping'
+      preLoaderRoute: typeof AuthenticatedStoreSlugShippingRouteImport
+      parentRoute: typeof AuthenticatedStoreSlugRoute
+    }
     '/_authenticated/store/$slug/settings': {
       id: '/_authenticated/store/$slug/settings'
       path: '/settings'
@@ -1224,6 +1263,7 @@ interface AuthenticatedStoreSlugRouteChildren {
   AuthenticatedStoreSlugPromosRoute: typeof AuthenticatedStoreSlugPromosRoute
   AuthenticatedStoreSlugRecoveryRoute: typeof AuthenticatedStoreSlugRecoveryRoute
   AuthenticatedStoreSlugSettingsRoute: typeof AuthenticatedStoreSlugSettingsRoute
+  AuthenticatedStoreSlugShippingRoute: typeof AuthenticatedStoreSlugShippingRoute
   AuthenticatedStoreSlugTeamRoute: typeof AuthenticatedStoreSlugTeamRoute
   AuthenticatedStoreSlugIndexRoute: typeof AuthenticatedStoreSlugIndexRoute
 }
@@ -1239,6 +1279,7 @@ const AuthenticatedStoreSlugRouteChildren: AuthenticatedStoreSlugRouteChildren =
     AuthenticatedStoreSlugPromosRoute: AuthenticatedStoreSlugPromosRoute,
     AuthenticatedStoreSlugRecoveryRoute: AuthenticatedStoreSlugRecoveryRoute,
     AuthenticatedStoreSlugSettingsRoute: AuthenticatedStoreSlugSettingsRoute,
+    AuthenticatedStoreSlugShippingRoute: AuthenticatedStoreSlugShippingRoute,
     AuthenticatedStoreSlugTeamRoute: AuthenticatedStoreSlugTeamRoute,
     AuthenticatedStoreSlugIndexRoute: AuthenticatedStoreSlugIndexRoute,
   }
@@ -1250,6 +1291,7 @@ const AuthenticatedStoreSlugRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedNewStoreRoute: typeof AuthenticatedNewStoreRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedAccountSecurityRoute: typeof AuthenticatedAccountSecurityRoute
   AuthenticatedCheckoutSubscriptionIdRoute: typeof AuthenticatedCheckoutSubscriptionIdRoute
@@ -1259,6 +1301,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedNewStoreRoute: AuthenticatedNewStoreRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedAccountSecurityRoute: AuthenticatedAccountSecurityRoute,
   AuthenticatedCheckoutSubscriptionIdRoute:
@@ -1308,3 +1351,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

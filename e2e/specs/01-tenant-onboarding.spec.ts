@@ -8,7 +8,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe("tenant signup and onboarding", () => {
   test("new user can sign up and create their first store", async ({ page }) => {
     const unique = `${RUN_PREFIX}-${Date.now().toString(36)}`;
-    const email = `${unique}@e2e.coreweb.test`;
+    const email = `${unique}@e2e.rentwebify.com`;
     const password = "E2E-Test-Passw0rd!";
     const storeSlug = tag("tenant1").toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 32);
     const storeName = `E2E Store ${unique.slice(-6)}`;

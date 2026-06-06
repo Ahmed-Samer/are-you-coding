@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Check, Minus } from "lucide-react";
+import { Check, Minus, Zap } from "lucide-react";
 import { PlatformShell } from "@/components/shells/PlatformShell";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -34,23 +34,20 @@ export const Route = createFileRoute("/pricing")({
   validateSearch: searchSchema,
   loader: ({ context }) => context.queryClient.ensureQueryData(plansQueryOptions),
   head: () => {
-    // JSON-LD is generated from the static seed mirror so SSR markup never
-    // diverges from the rendered cards. Whenever the DB seed changes, update
-    // src/lib/pricing-static.ts in the same commit.
     const productSchema = {
       "@context": "https://schema.org",
       "@type": "Product",
-      name: "CoreWeb",
+      name: "RentWebify",
       description:
-        "Hosted storefront platform for modern retailers — Starter, Growth, and Scale plans, billed monthly or quarterly.",
-      brand: { "@type": "Brand", name: "CoreWeb" },
+        "High-performance Website-as-a-Service infrastructure for modern retailers. Zero setup fees.",
+      brand: { "@type": "Brand", name: "RentWebify" },
       offers: STATIC_PLANS.map((p) => ({
         "@type": "Offer",
         name: `${p.name} (${p.interval === "monthly" ? "Monthly" : "Quarterly"})`,
         price: String(p.price_usd),
         priceCurrency: p.currency,
         category: "subscription",
-        url: `/pricing?interval=${p.interval}`,
+        url: `https://rentwebify.com/pricing?interval=${p.interval}`,
       })),
     };
 
@@ -66,19 +63,19 @@ export const Route = createFileRoute("/pricing")({
 
     return {
       meta: [
-        { title: "Pricing — CoreWeb" },
+        { title: "Pricing — RentWebify" },
         {
           name: "description",
           content:
-            "Simple pricing for Starter, Growth, and Scale. Pay monthly or quarterly via InstaPay, Vodafone Cash, or bank transfer.",
+            "Transparent pricing for scaling brands. Pay in EGP via InstaPay or Vodafone Cash. Zero commissions on your sales.",
         },
-        { property: "og:title", content: "Pricing — CoreWeb" },
+        { property: "og:title", content: "Pricing — RentWebify" },
         {
           property: "og:description",
           content:
-            "Three plans, monthly or quarterly. Local payment methods. No setup fees.",
+            "Enterprise-grade storefronts at simple monthly or quarterly rates. No hidden fees.",
         },
-        { property: "og:url", content: "/pricing" },
+        { property: "og:url", content: "https://rentwebify.com/pricing" },
         { property: "og:image", content: "/og-image.jpg" },
       ],
       links: [{ rel: "canonical", href: "/pricing" }],
@@ -98,7 +95,7 @@ function PricingError({ error }: { error: Error }) {
   return (
     <PlatformShell>
       <section className="mx-auto max-w-3xl px-6 py-20 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Pricing isn't loading right now</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Pricing is currently unavailable</h1>
         <p className="mt-3 text-sm text-muted-foreground break-words">{error.message}</p>
         <button
           type="button"
@@ -115,17 +112,17 @@ function PricingError({ error }: { error: Error }) {
 function PricingPending() {
   return (
     <PlatformShell>
-      <section className="border-b border-border">
-        <div className="mx-auto max-w-7xl px-6 py-16 text-center">
-          <Skeleton className="mx-auto h-9 w-72" />
-          <Skeleton className="mx-auto mt-4 h-5 w-96 max-w-full" />
+      <section className="border-b border-border bg-secondary/10">
+        <div className="mx-auto max-w-7xl px-6 py-20 text-center">
+          <Skeleton className="mx-auto h-12 w-80" />
+          <Skeleton className="mx-auto mt-4 h-6 w-96 max-w-full" />
         </div>
       </section>
       <section className="mx-auto max-w-6xl px-6 py-12">
-        <Skeleton className="mx-auto h-10 w-64" />
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <Skeleton className="mx-auto h-12 w-72 rounded-full" />
+        <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-[420px] w-full rounded-lg" />
+            <Skeleton key={i} className="h-[500px] w-full rounded-2xl" />
           ))}
         </div>
       </section>
@@ -140,8 +137,6 @@ function PricingPage() {
 
   const plans: PublicPlan[] = data.plans;
 
-  // Group plans by tier name, then pick the row matching the active interval.
-  // Fall back to monthly if a quarterly row is missing for a tier.
   const cards = TIER_ORDER.map((tier) => {
     const match = plans.find((p) => p.name === tier && p.interval === interval);
     const fallback = plans.find((p) => p.name === tier && p.interval === "monthly");
@@ -154,28 +149,29 @@ function PricingPage() {
 
   return (
     <PlatformShell>
-      <section className="border-b border-border">
-        <div className="mx-auto max-w-7xl px-6 py-16 text-center">
-          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
-            Simple pricing.
+      <section className="border-b border-border bg-background">
+        <div className="mx-auto max-w-7xl px-6 py-20 sm:py-28 text-center">
+          <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-foreground leading-tight">
+            Transparent pricing. <br className="hidden sm:block" />
+            <span className="text-muted-foreground">Zero commissions.</span>
           </h1>
-          <p className="mt-3 text-muted-foreground">
-            Pay in USD — or the EGP equivalent — via InstaPay, Vodafone Cash, or bank transfer.
+          <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+            Pay in USD — or the EGP equivalent — via InstaPay, Vodafone Cash, or direct bank transfer.
           </p>
         </div>
       </section>
 
       {/* Interval toggle */}
-      <section className="mx-auto max-w-6xl px-6 pt-10">
-        <div className="mx-auto flex w-fit items-center gap-1 rounded-full border border-border bg-card p-1 text-sm">
+      <section className="mx-auto max-w-6xl px-6 pt-12">
+        <div className="mx-auto flex w-fit items-center p-1.5 rounded-full border border-border/50 bg-secondary/50 shadow-inner">
           <button
             type="button"
             onClick={() => setInterval("monthly")}
             aria-pressed={interval === "monthly"}
             className={
-              "h-8 min-w-[112px] rounded-full px-4 font-medium transition-colors " +
+              "h-10 min-w-[120px] rounded-full px-6 font-bold transition-all " +
               (interval === "monthly"
-                ? "bg-primary text-primary-foreground"
+                ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                 : "text-muted-foreground hover:text-foreground")
             }
           >
@@ -186,18 +182,18 @@ function PricingPage() {
             onClick={() => setInterval("quarterly")}
             aria-pressed={interval === "quarterly"}
             className={
-              "h-8 min-w-[152px] rounded-full px-4 font-medium transition-colors inline-flex items-center justify-center gap-2 " +
+              "h-10 min-w-[180px] rounded-full px-6 font-bold transition-all inline-flex items-center justify-center gap-2 " +
               (interval === "quarterly"
-                ? "bg-primary text-primary-foreground"
+                ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                 : "text-muted-foreground hover:text-foreground")
             }
           >
             Quarterly
             <span
               className={
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold " +
+                "rounded-full px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider " +
                 (interval === "quarterly"
-                  ? "bg-primary-foreground/15 text-primary-foreground"
+                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                   : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400")
               }
             >
@@ -208,61 +204,67 @@ function PricingPage() {
       </section>
 
       {/* Plan cards */}
-      <section className="mx-auto max-w-6xl px-6 py-12">
+      <section className="mx-auto max-w-6xl px-6 py-16">
         {cards.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
-            Pricing is coming soon. Check back shortly.
+          <div className="rounded-2xl border border-dashed border-border bg-card p-16 text-center text-muted-foreground">
+            Pricing configuration is loading. Check back shortly.
           </div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map((p) => {
-              const periodLabel = p.interval === "quarterly" ? "/quarter" : "/month";
+              const periodLabel = p.interval === "quarterly" ? "/ quarter" : "/ month";
+              const isPopular = p.highlight;
               return (
                 <div
                   key={p.slug}
                   className={
-                    "relative flex min-h-[440px] flex-col rounded-lg border bg-card p-6 " +
-                    (p.highlight ? "border-foreground shadow-sm" : "border-border")
+                    "relative flex flex-col rounded-3xl border bg-card p-8 transition-all duration-300 " +
+                    (isPopular ? "border-primary shadow-xl scale-100 lg:scale-105 z-10" : "border-border shadow-sm hover:shadow-md")
                   }
                 >
-                  {p.highlight && (
-                    <span className="absolute -top-3 left-6 inline-flex items-center rounded-full bg-primary px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
-                      Most popular
-                    </span>
+                  {isPopular && (
+                    <div className="absolute -top-4 left-0 right-0 mx-auto w-fit px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold uppercase tracking-widest shadow-sm flex items-center gap-1.5">
+                      <Zap className="size-3.5 fill-current" />
+                      Most Popular
+                    </div>
                   )}
-                  <h3 className="text-lg font-semibold">{p.name}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{p.description}</p>
-                  <div className="mt-6 flex items-baseline gap-1">
-                    <span className="text-4xl font-semibold tracking-tight tabular-nums">
+                  <h3 className="text-2xl font-bold mt-2">{p.name}</h3>
+                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed h-10">{p.description}</p>
+                  
+                  <div className="mt-8 flex items-end gap-2 border-b border-border/50 pb-8">
+                    <span className="text-5xl font-black tracking-tight tabular-nums">
                       ${p.price_usd}
                     </span>
-                    <span className="text-sm text-muted-foreground">{periodLabel}</span>
+                    <span className="text-sm font-medium text-muted-foreground mb-1">{periodLabel}</span>
                   </div>
+                  
                   {p.interval === "quarterly" && (
-                    <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
-                      Save ~{quarterlySavingsPct(p.name as "Starter" | "Growth" | "Scale")}% vs paying monthly
+                    <p className="mt-4 text-sm font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 w-fit px-3 py-1 rounded-full">
+                      Save ~{quarterlySavingsPct(p.name as "Starter" | "Growth" | "Scale")}% vs monthly
                     </p>
                   )}
-                  <ul className="mt-6 space-y-2 text-sm">
+                  
+                  <ul className="mt-8 space-y-4 text-sm flex-1">
                     {(p.features ?? []).map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-muted-foreground">
-                        <Check className="mt-0.5 size-4 shrink-0 text-foreground" aria-hidden />
-                        <span>{f}</span>
+                      <li key={f} className="flex items-start gap-3 text-muted-foreground">
+                        <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                        <span className="font-medium text-foreground">{f}</span>
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-auto pt-6">
+                  
+                  <div className="mt-10 pt-4">
                     <Link
                       to="/onboarding"
                       search={{ plan: p.slug }}
                       className={
-                        "inline-flex h-10 w-full items-center justify-center rounded-md px-4 text-sm font-medium transition-colors " +
-                        (p.highlight
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                          : "border border-input bg-background hover:bg-accent")
+                        "inline-flex h-12 w-full items-center justify-center rounded-lg px-6 text-base font-bold transition-all " +
+                        (isPopular
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg hover:shadow-primary/25"
+                          : "border border-input bg-secondary hover:bg-secondary/80")
                       }
                     >
-                      Choose {p.name}
+                      Deploy {p.name}
                     </Link>
                   </div>
                 </div>
@@ -270,45 +272,45 @@ function PricingPage() {
             })}
           </div>
         )}
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          Prices in USD. Charged in EGP at the live exchange rate at checkout.{" "}
-          <Link to="/contact" className="underline underline-offset-2 hover:text-foreground">
-            Questions?
+        <p className="mt-12 text-center text-sm font-medium text-muted-foreground">
+          Prices are fixed in USD and charged in EGP at the live bank exchange rate at checkout.{" "}
+          <Link to="/contact" className="text-primary underline underline-offset-4 hover:opacity-80">
+            Have questions? Contact us.
           </Link>
         </p>
       </section>
 
-      {/* Comparison table (≥ sm) */}
-      <section className="hidden sm:block border-t border-border">
-        <div className="mx-auto max-w-6xl px-6 py-16">
-          <h2 className="text-center text-2xl font-semibold tracking-tight">
-            Compare plans
+      {/* Comparison table */}
+      <section className="hidden sm:block border-t border-border bg-background">
+        <div className="mx-auto max-w-5xl px-6 py-24">
+          <h2 className="text-center text-3xl font-bold tracking-tight text-foreground">
+            Compare platform features
           </h2>
-          <div className="mt-10 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="py-3 pr-4 text-left font-medium text-muted-foreground">Feature</th>
+          <div className="mt-16 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-secondary/50">
+                <tr>
+                  <th className="px-6 py-5 font-bold text-muted-foreground w-1/3">Feature</th>
                   {TIER_ORDER.map((tier) => (
-                    <th key={tier} className="px-4 py-3 text-left font-semibold">
+                    <th key={tier} className="px-6 py-5 font-bold text-foreground">
                       {tier}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/60">
                 {COMPARISON_MATRIX.map((row) => (
-                  <tr key={row.label} className="border-b border-border/60">
-                    <td className="py-3 pr-4 text-muted-foreground">{row.label}</td>
+                  <tr key={row.label} className="hover:bg-secondary/20 transition-colors">
+                    <td className="px-6 py-4 font-medium text-muted-foreground">{row.label}</td>
                     {TIER_ORDER.map((tier) => {
                       const v = row.values[tier];
                       const isEmpty = v === "—";
                       return (
-                        <td key={tier} className="px-4 py-3">
+                        <td key={tier} className="px-6 py-4">
                           {isEmpty ? (
-                            <Minus className="size-4 text-muted-foreground/60" aria-label="Not included" />
+                            <Minus className="size-5 text-muted-foreground/40" aria-label="Not included" />
                           ) : (
-                            <span>{v}</span>
+                            <span className="font-semibold text-foreground">{v}</span>
                           )}
                         </td>
                       );
@@ -322,16 +324,18 @@ function PricingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-3xl px-6 py-16">
-          <h2 className="text-center text-2xl font-semibold tracking-tight">
-            Pricing FAQ
+      <section className="border-t border-border bg-secondary/10">
+        <div className="mx-auto max-w-4xl px-6 py-24">
+          <h2 className="text-center text-3xl font-bold tracking-tight text-foreground">
+            Frequently Asked Questions
           </h2>
-          <Accordion type="single" collapsible className="mt-8 w-full">
+          <Accordion type="single" collapsible className="mt-12 w-full space-y-4">
             {PRICING_FAQ.map((f, i) => (
-              <AccordionItem key={f.question} value={`item-${i}`}>
-                <AccordionTrigger className="text-left">{f.question}</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground">
+              <AccordionItem key={f.question} value={`item-${i}`} className="border border-border/50 bg-background rounded-lg px-6">
+                <AccordionTrigger className="text-left font-bold text-base hover:no-underline hover:text-primary py-6">
+                  {f.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-muted-foreground text-base leading-relaxed pb-6 pt-0">
                   {f.answer}
                 </AccordionContent>
               </AccordionItem>

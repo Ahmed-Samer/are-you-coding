@@ -1,278 +1,390 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { lazy, Suspense, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { ExternalLink, Eye, Pause, Play } from "lucide-react";
+import { 
+  ArrowLeft, Store, ShieldAlert, CheckCircle, 
+  Clock, CreditCard, History, User, Globe, AlertTriangle,
+  FileText, Activity
+} from "lucide-react";
+
 import { AdminShell } from "@/components/admin/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
 import { getTenantDetail, suspendTenant, reactivateTenant } from "@/lib/admin.functions";
-import { listBillingAdjustments } from "@/lib/billing-admin.functions";
 import { timeAgo } from "@/lib/admin-utils";
+import { getStorefrontUrl } from "@/lib/branding";
 
-// Billing panels are heavy (charts, tables, mutation forms) and admin-only.
-// Lazy chunk loads when the user actually opens the Billing tab.
-const BillingTab = lazy(() => import("@/components/admin/billing/BillingTab"));
-
-type TenantStatus = "pending" | "active" | "suspended";
-
-function detailQuery(tenantId: string) {
-  return queryOptions({
-    queryKey: ["admin", "tenant", tenantId],
+const tenantDetailQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: ["admin", "tenants", "detail", tenantId],
     queryFn: () => getTenantDetail({ data: { tenantId } }),
   });
-}
 
 export const Route = createFileRoute("/_authenticated/admin/tenants/$tenantId")({
-  head: ({ params }) => ({ meta: [{ title: `Admin — Tenant ${params.tenantId}` }] }),
-  notFoundComponent: () => (
-    <AdminShell title="Tenant not found" breadcrumbs={[{ label: "Tenants", to: "/admin/tenants" }]}>
-      <div className="text-sm text-muted-foreground">No tenant with that id.</div>
-    </AdminShell>
-  ),
-  errorComponent: ({ error }) => (
-    <AdminShell title="Couldn't load tenant" breadcrumbs={[{ label: "Tenants", to: "/admin/tenants" }]}>
-      <div className="text-sm text-destructive">{error.message}</div>
-    </AdminShell>
-  ),
-  loader: async ({ context, params }) => {
-    try {
-      await context.queryClient.ensureQueryData(detailQuery(params.tenantId));
-    } catch (e) {
-      if (e instanceof Error && /Not found/i.test(e.message)) throw notFound();
-      throw e;
-    }
-  },
+  parseParams: (params) => ({ tenantId: params.tenantId }),
+  head: () => ({ meta: [{ title: "Admin — Tenant Details" }] }),
+  loader: ({ context, params }) => context.queryClient.ensureQueryData(tenantDetailQuery(params.tenantId)),
   component: TenantDetailPage,
 });
 
-function statusVariant(s: TenantStatus): "default" | "secondary" | "destructive" | "outline" {
+function statusVariant(s: string) {
   if (s === "active") return "default";
   if (s === "pending") return "secondary";
   if (s === "suspended") return "destructive";
   return "outline";
 }
 
-function TenantDetailPage() {
+export function TenantDetailPage() {
   const { tenantId } = Route.useParams();
-  const { data } = useSuspenseQuery(detailQuery(tenantId));
+  const { data } = useSuspenseQuery(tenantDetailQuery(tenantId));
   const qc = useQueryClient();
+
   const suspendFn = useServerFn(suspendTenant);
   const reactivateFn = useServerFn(reactivateTenant);
 
-  const [confirmSuspend, setConfirmSuspend] = useState(false);
+  const tenant = data.tenant;
+  const subscriptions = data.subscriptions ?? [];
+  const proofs = data.proofs ?? [];
+  const auditLogs = data.audit ?? [];
 
-  const suspend = useMutation({
-    mutationFn: () => suspendFn({ data: { tenantId } }),
-    onSuccess: () => {
-      toast.success("Tenant suspended");
-      qc.invalidateQueries({ queryKey: ["admin"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const reactivate = useMutation({
+  // Modal States
+  const [isSuspendOpen, setIsSuspendOpen] = useState(false);
+  const [suspendReason, setSuspendReason] = useState("");
+
+  // Mutations
+  const reactivateMut = useMutation({
     mutationFn: () => reactivateFn({ data: { tenantId } }),
     onSuccess: () => {
-      toast.success("Tenant reactivated");
-      qc.invalidateQueries({ queryKey: ["admin"] });
+      toast.success("Store has been successfully reactivated");
+      qc.invalidateQueries({ queryKey: ["admin", "tenants", "detail", tenantId] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: any) => toast.error(e.message),
   });
 
-  // Credit balance for the billing panels — also primes the ledger cache.
-  const creditQ = useQuery({
-    queryKey: ["admin", "billing", tenantId, "summary"],
-    queryFn: () =>
-      listBillingAdjustments({ data: { tenantId, page: 1, pageSize: 1 } }),
+  const suspendMut = useMutation({
+    mutationFn: () => suspendFn({ data: { tenantId, reason: suspendReason || undefined } }),
+    onSuccess: () => {
+      toast.success("Store has been suspended");
+      setIsSuspendOpen(false);
+      setSuspendReason("");
+      qc.invalidateQueries({ queryKey: ["admin", "tenants", "detail", tenantId] });
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
-  const tenant = data.tenant as any;
-  const subs = (data.subscriptions ?? []) as any[];
-  const proofs = (data.proofs ?? []) as any[];
-  const audits = (data.audit ?? []) as any[];
-  const status = (tenant.status ?? "pending") as TenantStatus;
-  const activeSub =
-    subs.find((s) => s.status === "active") ?? subs[0] ?? null;
+  if (!tenant) {
+    return (
+      <AdminShell title="Error" description="Tenant not found" breadcrumbs={[{ label: "Tenants", to: "/admin/tenants" }, { label: "Not Found" }]}>
+        <div className="p-6 text-center text-muted-foreground">The requested tenant could not be found.</div>
+      </AdminShell>
+    );
+  }
 
   return (
     <AdminShell
       title={tenant.name}
-      description={tenant.slug}
+      description={`Manage and audit storefront details for /${tenant.slug}`}
       breadcrumbs={[
         { label: "Tenants", to: "/admin/tenants" },
-        { label: tenant.name },
+        { label: tenant.name }
       ]}
       actions={
-        <>
-          <Button variant="outline" size="sm" asChild>
-            <a href={`/?store=${tenant.slug}`} target="_blank" rel="noreferrer">
-              <Eye className="size-4" /> Preview storefront
-            </a>
-          </Button>
-          {status === "suspended" ? (
-            <Button size="sm" disabled={reactivate.isPending} onClick={() => reactivate.mutate()}>
-              <Play className="size-4" /> Unsuspend
-            </Button>
-          ) : (
-            <Button variant="outline" size="sm" onClick={() => setConfirmSuspend(true)}>
-              <Pause className="size-4" /> Suspend
-            </Button>
-          )}
-        </>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/admin/tenants">
+            <ArrowLeft className="size-4 mr-2" /> Back to List
+          </Link>
+        </Button>
       }
     >
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
-          <TabsTrigger value="audit">Audit</TabsTrigger>
+      {/* Top Banner Status Info */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <Card className="lg:col-span-2 shadow-sm border-border">
+          <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-4 border-b border-border bg-muted/10">
+            <div className="size-12 rounded-lg bg-muted flex items-center justify-center border border-border">
+              <Store className="size-6 text-muted-foreground" />
+            </div>
+            <div className="flex-1">
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                {tenant.name}
+                <Badge variant={statusVariant(tenant.status)} className="capitalize">
+                  {tenant.status}
+                </Badge>
+              </CardTitle>
+              <CardDescription className="font-mono text-xs mt-0.5">ID: {tenant.id}</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 text-sm">
+            <div className="flex items-center gap-2.5 text-muted-foreground">
+              <Globe className="size-4 text-foreground/70" />
+              <span>Slug URL: </span>
+              <strong className="text-foreground font-mono">/{tenant.slug}</strong>
+            </div>
+            <div className="flex items-center gap-2.5 text-muted-foreground">
+              <User className="size-4 text-foreground/70" />
+              <span>Owner Reference: </span>
+              <strong className="text-foreground font-mono text-xs">{tenant.owner_id || "—"}</strong>
+            </div>
+            <div className="flex items-center gap-2.5 text-muted-foreground">
+              <Clock className="size-4 text-foreground/70" />
+              <span>Created On: </span>
+              <strong className="text-foreground">{new Date(tenant.created_at).toLocaleString()}</strong>
+            </div>
+            <div className="flex items-center gap-2.5 text-muted-foreground">
+              <Store className="size-4 text-foreground/70" />
+              <span>Business Niche: </span>
+              <strong className="text-foreground capitalize">{tenant.niche ? tenant.niche.replace("-", " ") : "—"}</strong>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Operations Policy Enforcement */}
+        <Card className="shadow-sm border-border flex flex-col justify-between">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold">Policy Enforcement</CardTitle>
+            <CardDescription>Instant administrative overrides for this tenant environment.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 pb-6 flex-1 flex flex-col justify-end">
+            {tenant.status === "suspended" ? (
+              <Button 
+                className="w-full bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                onClick={() => reactivateMut.mutate()}
+                disabled={reactivateMut.isPending}
+              >
+                <CheckCircle className="size-4 mr-2" /> Reactivate Storefront
+              </Button>
+            ) : (
+              <Button 
+                variant="destructive" 
+                className="w-full shadow-sm"
+                onClick={() => setIsSuspendOpen(true)}
+              >
+                <ShieldAlert className="size-4 mr-2" /> Suspend Storefront
+              </Button>
+            )}
+            <Button variant="outline" className="w-full" asChild>
+              <a
+                href={getStorefrontUrl(tenant.slug)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Visit Storefront <ArrowLeft className="size-4 ml-2 rotate-180" />
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Detail Analysis Tabs */}
+      <Tabs defaultValue="billing" className="space-y-4">
+        <TabsList className="border border-border p-1 bg-muted/30">
+          <TabsTrigger value="billing" className="inline-flex items-center gap-2">
+            <CreditCard className="size-4" /> Subscription & Billing
+          </TabsTrigger>
+          <TabsTrigger value="proofs" className="inline-flex items-center gap-2">
+            <FileText className="size-4" /> Payment Receipts ({proofs.length})
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="inline-flex items-center gap-2">
+            <Activity className="size-4" /> Security Audit Log ({auditLogs.length})
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 space-y-4">
-              <div className="rounded-xl border border-border bg-card p-5">
-                <h2 className="text-sm font-semibold mb-4">Account</h2>
-                <dl className="grid grid-cols-2 gap-y-3 text-sm">
-                  <dt className="text-muted-foreground">Status</dt>
-                  <dd>
-                    <Badge variant={statusVariant(status)} className="capitalize">{status}</Badge>
-                  </dd>
-                  <dt className="text-muted-foreground">Niche</dt>
-                  <dd className="capitalize">{tenant.niche ?? "—"}</dd>
-                  <dt className="text-muted-foreground">Owner ID</dt>
-                  <dd className="font-mono text-xs">{tenant.owner_id}</dd>
-                  <dt className="text-muted-foreground">Slug</dt>
-                  <dd className="font-mono text-xs">/{tenant.slug}</dd>
-                  <dt className="text-muted-foreground">Created</dt>
-                  <dd>{new Date(tenant.created_at).toLocaleDateString()} · {timeAgo(tenant.created_at)}</dd>
-                </dl>
-              </div>
-
-              <div className="rounded-xl border border-border bg-card">
-                <div className="px-5 py-4 border-b border-border">
-                  <h2 className="text-sm font-semibold">Subscription history</h2>
-                </div>
-                <ul className="divide-y divide-border text-sm">
-                  {subs.length === 0 && (
-                    <li className="px-5 py-6 text-muted-foreground text-center">No subscriptions yet.</li>
-                  )}
-                  {subs.map((s) => (
-                    <li key={s.id} className="px-5 py-3 flex items-center justify-between">
-                      <span>
-                        {s.plans?.name ?? "—"}
-                        <span className="text-muted-foreground text-xs ml-2">{s.plans?.interval}</span>
-                      </span>
-                      <span className="text-xs text-muted-foreground capitalize">
-                        {s.status} · {timeAgo(s.created_at)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="rounded-xl border border-border bg-card">
-                <div className="px-5 py-4 border-b border-border">
-                  <h2 className="text-sm font-semibold">Recent payment proofs</h2>
-                </div>
-                <ul className="divide-y divide-border">
-                  {proofs.length ? (
-                    proofs.map((p) => (
-                      <li key={p.id} className="px-5 py-3 flex items-center justify-between text-sm">
-                        <div>
-                          <div>${p.amount_usd ?? 0}</div>
-                          <div className="text-xs text-muted-foreground font-mono">{p.reference_number ?? "—"}</div>
-                        </div>
-                        <Badge
-                          variant={p.status === "approved" ? "default" : p.status === "pending" ? "secondary" : "outline"}
-                          className="capitalize"
-                        >
-                          {p.status}
-                        </Badge>
-                      </li>
-                    ))
-                  ) : (
-                    <li className="px-5 py-6 text-sm text-muted-foreground text-center">No proofs yet.</li>
-                  )}
-                </ul>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="rounded-xl border border-border bg-card p-5">
-                <h2 className="text-sm font-semibold mb-1">Open storefront</h2>
-                <p className="text-xs text-muted-foreground mb-3">View the live storefront as the public would see it.</p>
-                <Button variant="outline" size="sm" className="w-full" asChild>
-                  <a href={`/?store=${tenant.slug}`} target="_blank" rel="noreferrer">
-                    Open <ExternalLink className="size-3 ml-1" />
-                  </a>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
+        {/* Tab 1: Billing & Subscriptions */}
         <TabsContent value="billing" className="space-y-4">
-          <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <BillingTab
-              tenantId={tenantId}
-              activeSub={activeSub}
-              proofs={proofs}
-              creditBalanceUsd={creditQ.data?.creditBalanceUsd ?? 0}
-            />
-          </Suspense>
+          <Card className="shadow-sm border-border">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <History className="size-4 text-muted-foreground" /> Subscription Cycles History
+              </CardTitle>
+              <CardDescription>Comprehensive ledger of all subscription packages requested or applied to this tenant site.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead>Plan Package</TableHead>
+                    <TableHead>Pricing Model</TableHead>
+                    <TableHead>Interval</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Period End Date</TableHead>
+                    <TableHead className="text-right">Created</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subscriptions.map((sub: any) => (
+                    <TableRow key={sub.id}>
+                      <TableCell className="font-semibold text-foreground">
+                        {sub.plans?.name ?? "Custom Package Plan"}
+                      </TableCell>
+                      <TableCell className="tabular-nums font-mono text-sm">
+                        {sub.plans?.price_usd ? `$${sub.plans.price_usd}` : "Free tier"}
+                      </TableCell>
+                      <TableCell className="capitalize text-xs text-muted-foreground">
+                        {sub.plans?.interval ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={sub.status === "active" ? "default" : "secondary"} className="capitalize">
+                          {sub.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {sub.period_end ? new Date(sub.period_end).toLocaleDateString() : "Lifetime / Infinite"}
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
+                        {timeAgo(sub.created_at)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!subscriptions.length && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
+                        No historical subscription data associated with this storefront profile.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="audit" className="space-y-4">
-          <div className="rounded-xl border border-border bg-card">
-            <div className="px-5 py-4 border-b border-border">
-              <h2 className="text-sm font-semibold">Audit log</h2>
-              <p className="text-xs text-muted-foreground">Latest actions targeting this tenant.</p>
-            </div>
-            <ul className="divide-y divide-border text-sm">
-              {audits.length === 0 && (
-                <li className="px-5 py-6 text-muted-foreground text-center">No audit entries yet.</li>
-              )}
-              {audits.map((a) => (
-                <li key={a.id} className="px-5 py-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{a.action}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {timeAgo(a.created_at)}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground font-mono">
-                    actor: {a.actor_id}
-                  </div>
-                  {a.diff && (
-                    <pre className="mt-2 text-[11px] bg-muted/40 rounded p-2 overflow-x-auto">
-                      {JSON.stringify(a.diff, null, 2)}
-                    </pre>
+        {/* Tab 2: Manual Payment Proofs */}
+        <TabsContent value="proofs" className="space-y-4">
+          <Card className="shadow-sm border-border">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <FileText className="size-4 text-muted-foreground" /> Manual Ledger Proof Receipts
+              </CardTitle>
+              <CardDescription>Audited cash transfers, digital wallet statements, and InstaPay snapshot records.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead>Reference ID</TableHead>
+                    <TableHead className="text-right">Amount (USD)</TableHead>
+                    <TableHead className="text-right">Amount (EGP)</TableHead>
+                    <TableHead>Review Status</TableHead>
+                    <TableHead className="text-right">Submitted Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {proofs.map((proof: any) => (
+                    <TableRow key={proof.id}>
+                      <TableCell className="font-mono text-xs font-semibold">{proof.reference_number || "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">${proof.amount_usd ?? 0}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">{(proof.amount_egp ?? 0).toLocaleString()} EGP</TableCell>
+                      <TableCell>
+                        <Badge variant={proof.status === "approved" ? "default" : proof.status === "pending" ? "secondary" : "destructive"} className="capitalize">
+                          {proof.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">{timeAgo(proof.created_at)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {!proofs.length && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-sm">
+                        No payment upload receipts recorded from this domain merchant.
+                      </TableCell>
+                    </TableRow>
                   )}
-                </li>
-              ))}
-            </ul>
-          </div>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 3: Security Audit Log */}
+        <TabsContent value="audit" className="space-y-4">
+          <Card className="shadow-sm border-border">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Activity className="size-4 text-muted-foreground" /> Traceability System Audit Log
+              </CardTitle>
+              <CardDescription>Immutable environmental telemetry tracking administrative shifts and status changes.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="relative border-l border-border pl-4 ml-2 space-y-4 py-2">
+                {auditLogs.map((log: any) => (
+                  <div key={log.id} className="relative group">
+                    {/* Timeline Node Dot */}
+                    <div className="absolute -left-[21px] top-1.5 size-2.5 rounded-full border border-card bg-primary group-hover:scale-125 transition-transform" />
+                    <div className="bg-muted/40 rounded-lg p-3 border border-border text-xs shadow-sm">
+                      <div className="flex items-center justify-between gap-4 mb-1">
+                        <span className="font-semibold text-primary font-mono capitalize">{log.action}</span>
+                        <span className="text-muted-foreground">{new Date(log.created_at).toLocaleString()}</span>
+                      </div>
+                      <div className="text-muted-foreground font-mono text-[11px] mt-0.5">Actor User ID: {log.actor_id}</div>
+                      {log.diff && Object.keys(log.diff).length > 0 && (
+                        <pre className="mt-2 text-[10px] font-mono bg-background border border-border p-2 rounded max-h-32 overflow-y-auto text-foreground/80">
+                          {JSON.stringify(log.diff, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {!auditLogs.length && (
+                  <div className="text-center py-6 text-muted-foreground text-sm border border-dashed border-border rounded-lg">
+                    No sequential system modifications or log events logged for this database profile record.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
-      <ConfirmDialog
-        open={confirmSuspend}
-        onOpenChange={setConfirmSuspend}
-        title={`Suspend ${tenant.name}?`}
-        description="The storefront will go offline and the owner cannot use the dashboard until reactivated."
-        confirmLabel="Suspend tenant"
-        destructive
-        confirmationText="SUSPEND"
-        onConfirm={() => {
-          suspend.mutate();
-          setConfirmSuspend(false);
-        }}
-      />
+      {/* Administrative Suspension Dialogue Prompt Modal */}
+      <Dialog open={isSuspendOpen} onOpenChange={(o) => !o && setIsSuspendOpen(null as any)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="size-5" /> Enforcement Block: Suspend Storefront
+            </DialogTitle>
+            <DialogDescription>
+              Confirming this operational parameter will securely switch the application route parameters to a frozen state. 
+              The target storefront domain environment will render an inactive placeholder block page immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium mb-1.5 block text-foreground">
+              Administrative Reason for Operational Suspension
+            </label>
+            <Textarea 
+              placeholder="Input system enforcement reasons (e.g., terms of agreement non-compliance, financial invoicing dispute)..."
+              value={suspendReason}
+              onChange={(e) => setSuspendReason(e.target.value)}
+              className="resize-none border-border"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSuspendOpen(false)}>Cancel Action</Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => suspendMut.mutate()} 
+              disabled={suspendMut.isPending}
+            >
+              {suspendMut.isPending ? "Applying Block..." : "Confirm Suspension Block"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminShell>
   );
 }

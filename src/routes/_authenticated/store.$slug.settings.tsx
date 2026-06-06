@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { useStore } from "./store.$slug";
+import { useStore } from "@/lib/store-context";
 import { updateTenantSettings, deleteTenant } from "@/lib/catalog.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,9 @@ function SettingsPage() {
   const [currency, setCurrency] = useState((tenant as any).currency ?? "EGP");
   const [lowStock, setLowStock] = useState<number>((tenant as any).low_stock_threshold ?? 5);
   const [timezone, setTimezone] = useState<string>((tenant as any).timezone ?? DEFAULT_TIMEZONE);
+  const [metaToken, setMetaToken] = useState<string>((tenant as any).meta_token ?? "");
+  const [metaPhoneId, setMetaPhoneId] = useState<string>((tenant as any).meta_phone_id ?? "");
+  const [metaTemplateName, setMetaTemplateName] = useState<string>((tenant as any).meta_template_name ?? "");
   const [acceptingOrders, setAcceptingOrders] = useState<boolean>(
     (tenant as any).is_accepting_orders !== false,
   );
@@ -57,11 +60,40 @@ function SettingsPage() {
 
   const mut = useMutation({
     mutationFn: (input: any) => update({ data: input }),
-    onSuccess: () => {
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ["my-tenant", tenant.slug] });
+      const prev = qc.getQueryData<any>(["my-tenant", tenant.slug]);
+      // Optimistic update of the local store context cache
+      qc.setQueryData(["my-tenant", tenant.slug], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          tenant: { ...old.tenant, ...input, ...{ 
+            // Map camelCase to snake_case for DB fields used in UI
+            logo_url: input.logoUrl !== undefined ? input.logoUrl : old.tenant.logo_url,
+            accent_color: input.accentColor !== undefined ? input.accentColor : old.tenant.accent_color,
+            seo_title: input.seoTitle !== undefined ? input.seoTitle : old.tenant.seo_title,
+            seo_description: input.seoDescription !== undefined ? input.seoDescription : old.tenant.seo_description,
+            og_image_url: input.ogImageUrl !== undefined ? input.ogImageUrl : old.tenant.og_image_url,
+            currency: input.currency !== undefined ? input.currency : old.tenant.currency,
+            low_stock_threshold: input.lowStockThreshold !== undefined ? input.lowStockThreshold : old.tenant.low_stock_threshold,
+            whatsapp_e164: input.whatsappE164 !== undefined ? input.whatsappE164 : old.tenant.whatsapp_e164,
+            timezone: input.timezone !== undefined ? input.timezone : old.tenant.timezone,
+            is_accepting_orders: input.isAcceptingOrders !== undefined ? input.isAcceptingOrders : old.tenant.is_accepting_orders,
+            business_hours: input.businessHours !== undefined ? input.businessHours : old.tenant.business_hours,
+          }}
+        };
+      });
       toast.success("Settings saved");
+      return { prev };
+    },
+    onError: (e: any, _v, ctx: any) => {
+      if (ctx?.prev) qc.setQueryData(["my-tenant", tenant.slug], ctx.prev);
+      toast.error(e.message ?? "Failed to save settings");
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["my-tenant", tenant.slug] });
     },
-    onError: (e: any) => toast.error(e.message ?? "Failed"),
   });
 
   const delMut = useMutation({
@@ -207,6 +239,62 @@ function SettingsPage() {
         />
       </Section>
 
+      {/* WhatsApp Integration (Meta API) */}
+      <Section title="WhatsApp Integration (API)" description="Connect to Meta Cloud API for automatic order messages.">
+        <div>
+          <Label htmlFor="metaToken">Access Token</Label>
+          <Input
+            id="metaToken"
+            type="password"
+            placeholder="EAA..."
+            value={metaToken}
+            onChange={(e) => setMetaToken(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">Permanent access token from Meta Developer Console.</p>
+        </div>
+        <div>
+          <Label htmlFor="metaPhoneId">Phone Number ID</Label>
+          <Input
+            id="metaPhoneId"
+            placeholder="123456789012345"
+            value={metaPhoneId}
+            onChange={(e) => setMetaPhoneId(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="metaTemplateName">Template Name</Label>
+          <Input
+            id="metaTemplateName"
+            placeholder="order_confirmation"
+            value={metaTemplateName}
+            onChange={(e) => setMetaTemplateName(e.target.value)}
+          />
+        </div>
+        <SaveButton
+          loading={mut.isPending}
+          onClick={() => mut.mutate({
+            tenantId: tenant.id,
+            metaToken: metaToken.trim() || null,
+            metaPhoneId: metaPhoneId.trim() || null,
+            metaTemplateName: metaTemplateName.trim() || null,
+          })}
+        />
+      </Section>
+
+      {/* Shipping */}
+      <Section title="Shipping & Delivery" description="Manage countries, regions, and delivery fees.">
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-muted-foreground">
+            Configure dynamic shipping zones to automatically calculate delivery fees at checkout based on the customer's location.
+          </p>
+          <div>
+            <Link to="/store/$slug/shipping" params={{ slug: tenant.slug }}>
+              <Button variant="outline" size="sm">Configure shipping zones</Button>
+            </Link>
+          </div>
+        </div>
+      </Section>
+
       {/* Availability */}
       <AvailabilitySection
         timezone={timezone}
@@ -229,7 +317,7 @@ function SettingsPage() {
       {/* Domain */}
       <Section title="Custom domain" description="Connect your own domain to your storefront.">
         <p className="text-sm text-muted-foreground">
-          Currently serving on <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{tenant.slug}.coreweb.app</code>.
+          Currently serving on <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{tenant.slug}.rentwebify.com</code>.
         </p>
         <Link to="/store/$slug/domains" params={{ slug: tenant.slug }}>
           <Button variant="outline" size="sm">Set up custom domain</Button>

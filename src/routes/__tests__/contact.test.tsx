@@ -54,7 +54,7 @@ function fillValid() {
     target: { value: "jane@example.com" },
   });
   fireEvent.change(screen.getByLabelText(/^message$/i), {
-    target: { value: "Hello team, we're evaluating CoreWeb for our store." },
+    target: { value: "Hello team, we're evaluating RentWebify for our store." },
   });
 }
 

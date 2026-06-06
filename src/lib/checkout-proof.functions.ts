@@ -74,14 +74,14 @@ export const createProofUploadUrl = createServerFn({ method: "POST" })
     const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: sub, error } = await supabaseAdmin
-      .from("subscriptions")
-      .select("id, status, tenant_id, tenants!inner(owner_id)")
+    const { data: sub, error } = await (supabaseAdmin as any)
+      .from("account_subscriptions" as any)
+      .select("id, status, user_id")
       .eq("id", data.subscriptionId)
-      .maybeSingle<{ id: string; status: string; tenant_id: string; tenants: { owner_id: string } }>();
+      .maybeSingle();
     if (error) throw proofError("TRANSIENT", error.message);
     if (!sub) throw proofError("NOT_FOUND", "Subscription not found.");
-    if (sub.tenants.owner_id !== userId) {
+    if (sub.user_id !== userId) {
       throw proofError("FORBIDDEN", "You don't have access to this checkout.");
     }
     if (sub.status !== "pending_payment" && sub.status !== "pending_review") {
@@ -93,9 +93,8 @@ export const createProofUploadUrl = createServerFn({ method: "POST" })
     }
 
     const ext = extForMime(data.contentType);
-    // Tenant-scoped path so the existing storage.objects RLS (which keys on
-    // (storage.foldername(name))[1] = tenant_id) keeps admin reads working.
-    const storagePath = `${sub.tenant_id}/${sub.id}/proof-${Date.now()}.${ext}`;
+    // User-scoped path for account-level subscriptions
+    const storagePath = `${userId}/${sub.id}/proof-${Date.now()}.${ext}`;
 
     const { data: signed, error: signErr } = await supabaseAdmin.storage
       .from("payment-proofs")
@@ -140,20 +139,14 @@ export const finalizeProofUpload = createServerFn({ method: "POST" })
     const { writeAuditLog } = await import("@/lib/audit.server");
 
     // 1. Ownership + status
-    const { data: sub, error: sErr } = await supabaseAdmin
-      .from("subscriptions")
-      .select("id, status, tenant_id, tenants!inner(owner_id), plans!inner(price_usd)")
+    const { data: sub, error: sErr } = await (supabaseAdmin as any)
+      .from("account_subscriptions" as any)
+      .select("id, status, user_id, plans!inner(price_usd)")
       .eq("id", data.subscriptionId)
-      .maybeSingle<{
-        id: string;
-        status: string;
-        tenant_id: string;
-        tenants: { owner_id: string };
-        plans: { price_usd: number | string };
-      }>();
+      .maybeSingle();
     if (sErr) throw proofError("TRANSIENT", sErr.message);
     if (!sub) throw proofError("NOT_FOUND", "Subscription not found.");
-    if (sub.tenants.owner_id !== userId) {
+    if (sub.user_id !== userId) {
       throw proofError("FORBIDDEN", "You don't have access to this checkout.");
     }
     if (sub.status !== "pending_payment" && sub.status !== "pending_review") {
@@ -163,8 +156,8 @@ export const finalizeProofUpload = createServerFn({ method: "POST" })
         { status: sub.status },
       );
     }
-    // Storage path must belong to this tenant + subscription (defence-in-depth).
-    const expectedPrefix = `${sub.tenant_id}/${sub.id}/`;
+    // Storage path must belong to this user + subscription (defence-in-depth).
+    const expectedPrefix = `${userId}/${sub.id}/`;
     if (!data.storagePath.startsWith(expectedPrefix)) {
       throw proofError("FORBIDDEN", "Upload path does not match this checkout.");
     }
@@ -220,21 +213,20 @@ export const finalizeProofUpload = createServerFn({ method: "POST" })
     }
     const amountEgp = Math.round(amountUsd * fxRate * 100) / 100;
 
-    // 4. Idempotent insert-or-replace keyed by subscription_id.
-    //    Mark any prior still-pending proofs on this subscription as
-    //    superseded so a fresh `pending` row is unambiguous.
+    // 4. Idempotent insert-or-replace keyed by account_subscription_id.
     const supersedeNotes = "Superseded by re-upload";
     await supabaseAdmin
       .from("payment_proofs")
-      .update({ status: "rejected", reviewer_notes: supersedeNotes })
-      .eq("subscription_id", data.subscriptionId)
+      .update({ status: "rejected", reviewer_notes: supersedeNotes } as any)
+      .eq("account_subscription_id" as any, data.subscriptionId)
       .eq("status", "pending");
 
     const { data: insertedProof, error: insErr } = await supabaseAdmin
       .from("payment_proofs")
       .insert({
-        subscription_id: data.subscriptionId,
-        tenant_id: sub.tenant_id,
+        subscription_id: null,
+        account_subscription_id: data.subscriptionId,
+        tenant_id: null,
         payment_method_id: data.paymentMethodId,
         reference_number: data.referenceNumber,
         amount_usd: amountUsd,
@@ -243,7 +235,7 @@ export const finalizeProofUpload = createServerFn({ method: "POST" })
         screenshot_path: data.storagePath,
         notes: data.notes ?? null,
         status: "pending",
-      })
+      } as any)
       .select("id")
       .single();
     if (insErr || !insertedProof) {
@@ -251,9 +243,8 @@ export const finalizeProofUpload = createServerFn({ method: "POST" })
     }
 
     // 5. Atomically transition subscription → pending_review.
-    //    The DB enum gained 'pending_review' in PENDING_SQL_COMMANDS.sql
-    //    (Screen 21 block); cast through `any` until generated types refresh.
-    const { error: updErr } = await (supabaseAdmin.from("subscriptions") as any)
+    const { error: updErr } = await (supabaseAdmin as any)
+      .from("account_subscriptions" as any)
       .update({ status: "pending_review", updated_at: new Date().toISOString() })
       .eq("id", data.subscriptionId)
       .in("status", ["pending_payment", "pending_review"]);
@@ -261,7 +252,7 @@ export const finalizeProofUpload = createServerFn({ method: "POST" })
       throw proofError("TRANSIENT", updErr.message);
     }
 
-    // 6. Audit log (best-effort, never blocks the user-facing transition).
+    // 6. Audit log
     await writeAuditLog({
       actorId: userId,
       actorRole: "system",
@@ -269,8 +260,7 @@ export const finalizeProofUpload = createServerFn({ method: "POST" })
       targetTable: "payment_proofs",
       targetId: insertedProof.id,
       diff: {
-        subscription_id: data.subscriptionId,
-        tenant_id: sub.tenant_id,
+        account_subscription_id: data.subscriptionId,
         storage_path: data.storagePath,
         mime: sniffed,
         byte_size: byteSize,

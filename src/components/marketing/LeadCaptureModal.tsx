@@ -27,8 +27,8 @@ export function LeadCaptureModal({
   onOpenChange,
   source,
   eyebrow = "Before you go",
-  title = "Get the retail launch playbook — free.",
-  description = "A short PDF on launching a profitable WhatsApp-first store. No spam, unsubscribe anytime.",
+  title = "Get the RentWebify launch playbook — free.",
+  description = "A short PDF on launching a profitable Website-as-a-Service platform. No spam, unsubscribe anytime.",
   cta = "Send me the PDF",
 }: LeadCaptureModalProps) {
   const [email, setEmail] = useState("");
@@ -53,7 +53,7 @@ export function LeadCaptureModal({
             <DialogHeader>
               <DialogTitle>You're on the list.</DialogTitle>
               <DialogDescription>
-                We just sent the retail launch playbook to your inbox.
+                We just sent the RentWebify launch playbook to your inbox.
               </DialogDescription>
             </DialogHeader>
             <Button className="mt-2 w-full" onClick={() => onOpenChange(false)}>

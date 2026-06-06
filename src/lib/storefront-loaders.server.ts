@@ -48,7 +48,7 @@ const loadStorefrontUncached = withTiming("loadStorefront", async (tenantId: str
   ] = await Promise.all([
     sb
       .from("tenants")
-      .select("id, slug, name, niche, status, whatsapp_e164, theme, logo_url, accent_color, seo_title, seo_description, og_image_url, currency, business_hours, is_accepting_orders, timezone")
+      .select("id, slug, name, niche, status, template, whatsapp_e164, theme, logo_url, accent_color, seo_title, seo_description, og_image_url, currency, business_hours, is_accepting_orders, timezone, shipping_zones")
       .eq("id", tenantId)
       .eq("status", "active")
       .maybeSingle(),

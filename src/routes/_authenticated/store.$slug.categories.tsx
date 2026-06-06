@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useStore } from "./store.$slug";
+import { useStore } from "@/lib/store-context";
 import {
   listMyCategories,
   upsertCategory,

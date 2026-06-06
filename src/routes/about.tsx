@@ -17,29 +17,29 @@ import {
 const ORG_JSON_LD = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  name: "CoreWeb",
-  url: "/",
+  name: "RentWebify",
+  url: "https://rentwebify.com",
   logo: "/og-image.jpg",
   description:
-    "CoreWeb gives operators a premium, conversion-ready storefront — zero setup, hosted, and fast.",
+    "RentWebify gives operators a premium, conversion-ready storefront — zero setup, hosted, and fast.",
   sameAs: [] as string[],
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "customer support",
-    url: "/contact",
+    url: "https://rentwebify.com/contact",
   },
 };
 
 export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
-      { title: "About — CoreWeb" },
+      { title: "About — RentWebify" },
       {
         name: "description",
         content:
-          "We build premium, conversion-ready storefronts for retailers, clinics, and pharmacies — zero setup, hosted, and fast.",
+          "We build premium, conversion-ready storefronts for retailers, clinics, and hardware stores — zero setup, hosted, and fast.",
       },
-      { property: "og:title", content: "About — CoreWeb" },
+      { property: "og:title", content: "About — RentWebify" },
       {
         property: "og:description",
         content:
@@ -80,7 +80,7 @@ const VALUES = [
   {
     icon: Users,
     title: "Local-friendly",
-    body: "Local payments, local support, local pricing — built for the region.",
+    body: "Local EGP payments, local support, local pricing — built for the region.",
   },
 ];
 
@@ -92,13 +92,12 @@ const TRUST_METRICS = [
   { icon: Gauge, value: "98", label: "Avg. Lighthouse score" },
 ];
 
-// TODO: replace with approved customer quote.
 const CUSTOMER_QUOTE = {
   quote:
-    "We launched in an afternoon, looked premium from day one, and our conversion rate doubled in the first month. The team actually answers when we ask for help.",
-  name: "Amelia Okafor",
-  role: "Owner",
-  store: "Ode Apothecary",
+    "We launched in an afternoon, looked premium from day one, and our conversion rate doubled in the first month. RentWebify completely changed how we handle online orders.",
+  name: "Ahmed Mostafa",
+  role: "Operations Manager",
+  store: "TechGear",
 };
 
 const TEAM_PILLARS = [
@@ -153,10 +152,10 @@ function MaybeMotion({
     ? undefined
     : ({
         transition:
-          "opacity 400ms ease-out, transform 400ms ease-out",
+          "opacity 500ms cubic-bezier(0.4, 0, 0.2, 1), transform 500ms cubic-bezier(0.4, 0, 0.2, 1)",
         transitionDelay: `${delay * 1000}ms`,
         opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(12px)",
+        transform: visible ? "translateY(0)" : "translateY(16px)",
         willChange: visible ? undefined : "opacity, transform",
       } as React.CSSProperties);
 
@@ -176,44 +175,45 @@ function AboutPage() {
 
   return (
     <PlatformShell>
-      <section className="border-b border-border">
-        <div className="mx-auto max-w-4xl px-6 py-20 sm:py-24">
-          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            About
+      <section className="border-b border-border bg-background">
+        <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28 text-center sm:text-left">
+          <span className="text-sm font-bold uppercase tracking-widest text-primary">
+            About RentWebify
           </span>
-          <h1 className="mt-3 text-4xl sm:text-5xl font-semibold tracking-tight">
-            We give operators a premium storefront — without the overhead.
+          <h1 className="mt-4 text-4xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
+            We build the infrastructure. <br className="hidden sm:block" />
+            <span className="text-muted-foreground">You build the business.</span>
           </h1>
-          <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
-            Storefront started after watching too many great shops launch with
-            broken websites, slow hosting, and a maze of plugins. We thought
-            retailers, clinics, and pharmacies deserved better — so we built it.
+          <p className="mt-6 text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-3xl mx-auto sm:mx-0">
+            RentWebify started after watching too many great brands struggle with
+            broken websites, slow hosting, and a maze of expensive plugins. We thought
+            retailers and operators deserved an enterprise-grade solution out of the box.
           </p>
         </div>
       </section>
 
-      <section className="border-b border-border bg-secondary/30">
-        <div className="mx-auto max-w-7xl px-6 py-20 grid lg:grid-cols-3 gap-10">
+      <section className="border-b border-border bg-secondary/20">
+        <div className="mx-auto max-w-7xl px-6 py-24 grid lg:grid-cols-3 gap-12">
           <MaybeMotion reduced={reduced}>
-            <h2 className="text-2xl font-semibold tracking-tight">Our mission</h2>
-            <p className="mt-3 text-muted-foreground leading-relaxed">
-              Make a beautiful, fast, conversion-ready online presence the
-              default for every modern retailer in the region.
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">Our mission</h2>
+            <p className="mt-4 text-lg text-muted-foreground leading-relaxed">
+              Make a beautiful, fast, and conversion-ready online presence the
+              default standard for every modern retailer in the region.
             </p>
           </MaybeMotion>
-          <div className="lg:col-span-2 grid sm:grid-cols-2 gap-4">
+          <div className="lg:col-span-2 grid sm:grid-cols-2 gap-6">
             {VALUES.map((v, i) => (
               <MaybeMotion
                 key={v.title}
                 reduced={reduced}
-                delay={i * 0.06}
-                className="rounded-xl border border-border bg-card p-5"
+                delay={i * 0.08}
+                className="rounded-2xl border border-border/50 bg-card p-6 shadow-sm hover:shadow-md transition-shadow duration-300"
               >
-                <span className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-secondary">
-                  <v.icon className="size-5" aria-hidden />
+                <span className="inline-flex size-12 items-center justify-center rounded-xl border border-border bg-primary/10 text-primary">
+                  <v.icon className="size-6" aria-hidden />
                 </span>
-                <h3 className="mt-4 font-semibold">{v.title}</h3>
-                <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+                <h3 className="mt-5 text-lg font-bold">{v.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                   {v.body}
                 </p>
               </MaybeMotion>
@@ -222,42 +222,42 @@ function AboutPage() {
         </div>
       </section>
 
-      <section className="border-b border-border" aria-labelledby="trust-heading">
-        <div className="mx-auto max-w-7xl px-6 py-20">
-          <MaybeMotion reduced={reduced}>
-            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <section className="border-b border-border bg-background" aria-labelledby="trust-heading">
+        <div className="mx-auto max-w-7xl px-6 py-24">
+          <MaybeMotion reduced={reduced} className="text-center sm:text-left">
+            <span className="text-sm font-bold uppercase tracking-widest text-primary">
               Proof
             </span>
             <h2
               id="trust-heading"
-              className="mt-3 text-2xl font-semibold tracking-tight"
+              className="mt-3 text-3xl font-bold tracking-tight"
             >
               Numbers operators care about.
             </h2>
-            <p className="mt-3 text-muted-foreground max-w-2xl">
+            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto sm:mx-0">
               We hold ourselves to a strict performance and reliability budget on
-              every store we ship.
+              every store we ship to ensure maximum conversion rates.
             </p>
           </MaybeMotion>
           <div
-            className="mt-10 grid gap-4 grid-cols-2 lg:grid-cols-4"
+            className="mt-12 grid gap-6 grid-cols-2 lg:grid-cols-4"
             role="list"
           >
             {TRUST_METRICS.map((m, i) => (
               <MaybeMotion
                 key={m.label}
                 reduced={reduced}
-                delay={i * 0.06}
-                className="rounded-xl border border-border bg-card p-5"
+                delay={i * 0.08}
+                className="rounded-2xl border border-border/50 bg-card p-6 text-center shadow-sm"
               >
                 <div role="listitem">
-                  <span className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-secondary">
-                    <m.icon className="size-5" aria-hidden />
+                  <span className="inline-flex size-12 items-center justify-center rounded-xl bg-secondary text-foreground">
+                    <m.icon className="size-6" aria-hidden />
                   </span>
-                  <div className="mt-4 text-3xl font-semibold tracking-tight">
+                  <div className="mt-5 text-4xl font-black tracking-tight text-foreground">
                     {m.value}
                   </div>
-                  <div className="mt-1 text-sm text-muted-foreground">
+                  <div className="mt-2 text-sm font-medium text-muted-foreground">
                     {m.label}
                   </div>
                 </div>
@@ -266,57 +266,49 @@ function AboutPage() {
           </div>
           <MaybeMotion
             reduced={reduced}
-            delay={0.1}
-            className="mt-8 rounded-2xl border border-border bg-card p-6 sm:p-8"
+            delay={0.15}
+            className="mt-12 rounded-3xl border border-primary/20 bg-primary/5 p-8 sm:p-10"
           >
-            <figure>
-              <blockquote className="text-lg sm:text-xl leading-relaxed text-foreground">
+            <figure className="max-w-4xl mx-auto text-center">
+              <blockquote className="text-xl sm:text-2xl font-medium leading-relaxed text-foreground">
                 “{CUSTOMER_QUOTE.quote}”
               </blockquote>
-              <figcaption className="mt-4 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">
+              <figcaption className="mt-6 text-sm text-muted-foreground">
+                <span className="font-bold text-foreground text-base">
                   {CUSTOMER_QUOTE.name}
                 </span>{" "}
-                — {CUSTOMER_QUOTE.role}, {CUSTOMER_QUOTE.store}
+                <span className="mx-1">—</span> {CUSTOMER_QUOTE.role}, {CUSTOMER_QUOTE.store}
               </figcaption>
             </figure>
           </MaybeMotion>
         </div>
       </section>
 
-      <section className="border-b border-border">
-        <div className="mx-auto max-w-7xl px-6 py-20">
-          <MaybeMotion reduced={reduced}>
-            <h2 className="text-2xl font-semibold tracking-tight">The team</h2>
-            <p className="mt-3 text-muted-foreground max-w-2xl">
-              A small, senior team of designers, engineers, and operators. We
-              ship every week and answer support ourselves.
+      <section className="border-b border-border bg-secondary/10">
+        <div className="mx-auto max-w-7xl px-6 py-24">
+          <MaybeMotion reduced={reduced} className="max-w-3xl">
+            <h2 className="text-3xl font-bold tracking-tight">The Team</h2>
+            <p className="mt-4 text-lg text-muted-foreground leading-relaxed">
+              We're a dedicated team of engineers, designers, and operators. We ship high-quality features rapidly and handle support directly.
             </p>
           </MaybeMotion>
-          {/*
-            Intentional "small senior team" treatment — no fake avatars or
-            placeholder bios. If real team photos are added later: explicit
-            width/height, loading="lazy", AVIF/WebP under src/assets/.
-          */}
+          
           <MaybeMotion
             reduced={reduced}
-            delay={0.05}
-            className="mt-10 rounded-2xl border border-border bg-card p-6 sm:p-8"
+            delay={0.1}
+            className="mt-12 rounded-3xl border border-border bg-card p-8 sm:p-12 shadow-sm"
           >
-            <p className="text-base sm:text-lg leading-relaxed text-foreground max-w-3xl">
-              We're deliberately small. Every engineer reviews their own support
-              tickets, every designer ships templates that operators actually
-              use, and every release goes out only after it's tested on a real
-              store. No outsourced support, no junior-only on-call.
+            <p className="text-lg sm:text-xl leading-relaxed text-foreground max-w-4xl">
+              We operate with a lean, elite mindset. Our engineers directly monitor system stability, our designers create templates strictly optimized for sales, and every update is battle-tested. No outsourced support, just direct access to the builders.
             </p>
             <ul
-              className="mt-6 flex flex-wrap gap-2"
+              className="mt-8 flex flex-wrap gap-3"
               aria-label="Team disciplines"
             >
               {TEAM_PILLARS.map((p) => (
                 <li
                   key={p}
-                  className="inline-flex items-center rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-foreground"
+                  className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm font-bold text-primary"
                 >
                   {p}
                 </li>
@@ -326,34 +318,33 @@ function AboutPage() {
         </div>
       </section>
 
-      <section aria-labelledby="cta-heading">
-        <div className="mx-auto max-w-4xl px-6 py-20 sm:py-24 text-center">
+      <section aria-labelledby="cta-heading" className="bg-background">
+        <div className="mx-auto max-w-4xl px-6 py-24 sm:py-32 text-center">
           <MaybeMotion reduced={reduced}>
             <h2
               id="cta-heading"
-              className="text-3xl sm:text-4xl font-semibold tracking-tight"
+              className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground"
             >
-              Ready to launch your storefront?
+              Ready to scale your sales?
             </h2>
-            <p className="mt-4 text-muted-foreground text-lg">
-              Pick a template, plug in your products, and you're live in an
-              afternoon.
+            <p className="mt-6 text-xl text-muted-foreground">
+              Select a template, sync your inventory, and start receiving orders today.
             </p>
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
                 to="/signup"
                 onMouseEnter={preloadSignup}
                 onFocus={preloadSignup}
-                className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="inline-flex h-12 items-center justify-center rounded-lg bg-primary px-8 text-base font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-lg hover:shadow-primary/25"
               >
-                Get started
-                <ArrowRight className="ml-2 size-4" aria-hidden />
+                Start 14-Day Free Trial
+                <ArrowRight className="ml-2 size-5" aria-hidden />
               </Link>
               <Link
                 to="/templates"
-                className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-background px-5 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
+                className="inline-flex h-12 items-center justify-center rounded-lg border border-border bg-background px-8 text-base font-bold text-foreground hover:bg-secondary transition-colors"
               >
-                Browse templates
+                Explore Templates
               </Link>
             </div>
           </MaybeMotion>

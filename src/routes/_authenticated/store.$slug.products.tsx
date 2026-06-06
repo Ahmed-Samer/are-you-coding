@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useStore } from "./store.$slug";
+import { useStore } from "@/lib/store-context";
 import {
   listMyProducts, listMyCategories, upsertProduct, deleteProduct, bulkProductAction, exportProductsCsv,
 } from "@/lib/catalog.functions";
@@ -26,7 +26,7 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { formatPrice } from "@/lib/cart";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, PackagePlus } from "lucide-react";
 
 // Heavy admin-only modules — lazy-loaded so storefront visitors never download them
 // and the products page itself ships a leaner initial chunk.
@@ -131,12 +131,33 @@ export function ProductsPage() {
 
   const saveMut = useMutation({
     mutationFn: (input: any) => save({ data: input }),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ["prods", tenant.id] });
+      const prev = qc.getQueryData<any>(["prods", tenant.id]);
+      if (input.id) {
+        qc.setQueryData(["prods", tenant.id], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            products: (old.products ?? []).map((p: any) => 
+              p.id === input.id 
+                ? { ...p, name: input.name, sku: input.sku, price_cents: input.priceCents, stock: input.stock, is_active: input.isActive } 
+                : p
+            )
+          };
+        });
+      }
+      return { prev };
+    },
+    onError: (e: any, _v, ctx: any) => {
+      if (ctx?.prev) qc.setQueryData(["prods", tenant.id], ctx.prev);
+      toast.error(e.message ?? "Failed");
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["prods", tenant.id] });
       setOpen(false);
       toast.success("Product saved");
     },
-    onError: (e: any) => toast.error(e.message ?? "Failed"),
   });
   const delMut = useMutation({
     mutationFn: (id: string) => del({ data: { tenantId: tenant.id, id } }),
@@ -159,12 +180,34 @@ export function ProductsPage() {
   const bulkMut = useMutation({
     mutationFn: (input: { ids: string[]; action: "delete" | "activate" | "hide" }) =>
       bulk({ data: { tenantId: tenant.id, ...input } }),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ["prods", tenant.id] });
+      const prev = qc.getQueryData<any>(["prods", tenant.id]);
+      qc.setQueryData(["prods", tenant.id], (old: any) => {
+        if (!old) return old;
+        const products = old.products ?? [];
+        if (input.action === "delete") {
+          return { ...old, products: products.filter((p: any) => !input.ids.includes(p.id)) };
+        }
+        if (input.action === "activate") {
+          return { ...old, products: products.map((p: any) => input.ids.includes(p.id) ? { ...p, is_active: true } : p) };
+        }
+        if (input.action === "hide") {
+          return { ...old, products: products.map((p: any) => input.ids.includes(p.id) ? { ...p, is_active: false } : p) };
+        }
+        return old;
+      });
+      return { prev };
+    },
+    onError: (e: any, _v, ctx: any) => {
+      if (ctx?.prev) qc.setQueryData(["prods", tenant.id], ctx.prev);
+      toast.error(e.message ?? "Failed");
+    },
     onSuccess: (r: any) => {
       qc.invalidateQueries({ queryKey: ["prods", tenant.id] });
       setSelected(new Set());
       toast.success(`Updated ${r.count} product${r.count === 1 ? "" : "s"}`);
     },
-    onError: (e: any) => toast.error(e.message ?? "Failed"),
   });
 
   function openNew() { setForm(emptyForm(defaultCurrency)); setOpen(true); }
@@ -301,8 +344,17 @@ export function ProductsPage() {
         {isLoading ? (
           <TableSkeleton rows={5} cols={5} />
         ) : (data?.products ?? []).length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">
-            No products yet. Add your first product to start selling.
+          <div className="flex flex-col items-center justify-center p-16 text-center">
+            <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4 text-muted-foreground">
+              <PackagePlus className="size-8" />
+            </div>
+            <h3 className="text-lg font-semibold mb-1">Your Catalog is Empty</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mb-6">
+              Start building your store by adding your first product. You can also import multiple products via CSV.
+            </p>
+            <div className="flex gap-3">
+              <Button onClick={openNew}>Add First Product</Button>
+            </div>
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">No products match your filters.</div>

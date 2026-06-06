@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { toast } from "sonner";
 import { captureLead, type CaptureLeadInputType } from "@/lib/leads.functions";
 
 export type LeadStatus = "idle" | "validating" | "pending" | "success" | "error";
@@ -41,8 +42,10 @@ export function useLeadCapture() {
       setStatus("validating");
       const parsed = EmailSchema.safeParse(email);
       if (!parsed.success) {
-        setError(parsed.error.issues[0]?.message ?? "Invalid email.");
+        const errorMsg = parsed.error.issues[0]?.message ?? "Invalid email.";
+        setError(errorMsg);
         setStatus("error");
+        toast.error(errorMsg);
         return false;
       }
       setError(null);
@@ -56,6 +59,7 @@ export function useLeadCapture() {
           },
         });
         setStatus("success");
+        toast.success("Welcome to RentWebify! Check your inbox.");
         return true;
       } catch (err) {
         const message =
@@ -64,6 +68,7 @@ export function useLeadCapture() {
             : "Something went wrong. Please try again.";
         setError(message);
         setStatus("error");
+        toast.error(message);
         return false;
       }
     },

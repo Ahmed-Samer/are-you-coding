@@ -16,11 +16,9 @@ import { getRecoveredCart } from "@/lib/abandoned-carts.functions";
 import { useAbandonedCartSync } from "@/lib/use-abandoned-cart-sync";
 import type { ResolvedTenant } from "@/lib/tenant.functions";
 import { getAvailability } from "@/lib/availability";
-import { AnnouncementBar, StorefrontHeader, StorefrontFooter } from "./StorefrontHeader";
-import {
-  HeroSlider, CatChip, ProductCard, ProductSkeletonGrid, FeaturedSection, LoadMoreButton,
-} from "./ProductGrid";
 import { quickAdd } from "./storefront-utils";
+import { TemplateComponents } from "../templates";
+import { TemplateProps } from "../templates/types";
 
 // Read `?product=<uuid>` (validated by the index route's searchSchema) so
 // the drawer becomes deep-linkable and back/forward-friendly. We use
@@ -272,144 +270,42 @@ function StorefrontInner({ tenant }: { tenant: ResolvedTenant }) {
     [navigate],
   );
 
+  const TemplateComponent = TemplateComponents[(tenant.template || "classic") as keyof typeof TemplateComponents] || TemplateComponents.classic;
+
+  const templateProps: TemplateProps = {
+    tenant,
+    storeMeta,
+    themeStyle,
+    accent,
+    logoUrl,
+    currency,
+    announcement,
+    availability,
+    customDomain,
+    products,
+    categories,
+    featured,
+    heroSlides,
+    search,
+    activeCat,
+    sort,
+    visibleProducts: visible,
+    totalFilteredCount: filtered.length,
+    hasMore: visible.length < filtered.length,
+    isLoading,
+    onSearchChange: handleSearchChange,
+    onCategoryChange: (catId) => dispatch({ type: "category", value: catId }),
+    onSortChange: (v) => dispatch({ type: "sort", value: v as SortKey }),
+    onLoadMore: handleLoadMore,
+    onSelectProduct: handleSelectProduct,
+    onQuickAdd: handleQuickAdd,
+    cartCount: cart.count,
+    onOpenCart: handleOpenCart,
+  };
+
   return (
-    <div className="min-h-dvh flex flex-col bg-background text-foreground" style={themeStyle}>
-      {announcement && <AnnouncementBar text={announcement} accent={accent} />}
-
-      <StorefrontHeader
-        tenantName={tenant.name}
-        logoUrl={logoUrl}
-        accent={accent}
-        customDomain={customDomain}
-        search={search}
-        onSearchChange={handleSearchChange}
-        cartCount={cart.count}
-        onOpenCart={handleOpenCart}
-        isOpen={availability.isOpen}
-      />
-
-      <main className="flex-1">
-        <HeroSlider slides={heroSlides} accent={accent} fallbackName={tenant.name} />
-
-        {/* Mobile search */}
-        <div className="sm:hidden border-b border-border">
-          <div className="px-6 py-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <Input
-                placeholder="Search products"
-                className="pl-9"
-                value={search}
-                onChange={(e) => dispatch({ type: "search", value: e.target.value })}
-                aria-label="Search products"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Category filters (nested) */}
-        {categories.length > 0 && (() => {
-          const topLevel = categories.filter((c: any) => !c.parent_id);
-          const childrenOf = (id: string) => categories.filter((c: any) => c.parent_id === id);
-          // Determine which top-level ancestor is currently active
-          const activeRoot = (() => {
-            if (!activeCat) return null;
-            const cur = categories.find((c: any) => c.id === activeCat);
-            if (!cur) return null;
-            const rootId = (cur.path && typeof cur.path === "string") ? cur.path.split("/")[0] : cur.id;
-            return rootId;
-          })();
-          const subs = activeRoot ? childrenOf(activeRoot) : [];
-          return (
-            <div className="border-b border-border">
-              <div className="mx-auto max-w-6xl px-6 py-3 flex flex-nowrap gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [overscroll-behavior-x:contain] [scroll-snap-type:x_proximity]">
-                <CatChip active={!activeCat} accent={accent} onClick={() => dispatch({ type: "category", value: null })}>All</CatChip>
-                {topLevel.map((c: any) => (
-                  <CatChip key={c.id} active={activeRoot === c.id} accent={accent} onClick={() => dispatch({ type: "category", value: c.id })}>
-                    {c.name}
-                  </CatChip>
-                ))}
-              </div>
-              {subs.length > 0 && (
-                <div className="mx-auto max-w-6xl px-6 pb-3 flex flex-nowrap gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [overscroll-behavior-x:contain] [scroll-snap-type:x_proximity]">
-                  {subs.map((c: any) => (
-                    <CatChip key={c.id} active={activeCat === c.id} accent={accent} onClick={() => dispatch({ type: "category", value: c.id })}>
-                      {c.name}
-                    </CatChip>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {!isLoading && !search && !activeCat && (
-          <FeaturedSection
-            items={featured}
-            currency={currency}
-            accent={accent}
-            onPick={handleSelectProduct}
-            onQuickAdd={handleQuickAdd}
-          />
-        )}
-
-        {/* Sort + count bar */}
-        <div className="mx-auto max-w-6xl px-6 pt-8 flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground tabular-nums">
-            {isLoading ? "—" : `${filtered.length} ${filtered.length === 1 ? "product" : "products"}`}
-          </p>
-          <Select value={sort} onValueChange={(v) => dispatch({ type: "sort", value: v as SortKey })}>
-            <SelectTrigger className="h-9 w-[160px] text-xs" aria-label="Sort products">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="featured">Featured</SelectItem>
-              <SelectItem value="newest">Newest</SelectItem>
-              <SelectItem value="price-asc">Price: Low to High</SelectItem>
-              <SelectItem value="price-desc">Price: High to Low</SelectItem>
-              <SelectItem value="name">Name (A–Z)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Product grid */}
-        <section className="mx-auto max-w-6xl px-6 py-8">
-          {isLoading ? (
-            <ProductSkeletonGrid count={8} />
-          ) : filtered.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border p-16 text-center text-sm text-muted-foreground">
-              No products match your search.
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-8">
-                {visible.map((p: any) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    currency={currency}
-                    accent={accent}
-                    onSelect={handleSelectProduct}
-                    onQuickAdd={handleQuickAdd}
-                  />
-                ))}
-              </div>
-              {visible.length < filtered.length && (
-                <LoadMoreButton
-                  remaining={filtered.length - visible.length}
-                  onClick={handleLoadMore}
-                />
-              )}
-            </>
-          )}
-        </section>
-      </main>
-
-      <StorefrontFooter
-        tenantName={tenant.name}
-        description={storeMeta.seo_description || "Quality products, delivered fast."}
-        theme={theme}
-      />
+    <>
+      <TemplateComponent {...templateProps} />
 
       {detail && (
         <Suspense fallback={null}>
@@ -438,9 +334,10 @@ function StorefrontInner({ tenant }: { tenant: ResolvedTenant }) {
             accent={accent}
             tenantWhatsapp={storeMeta.whatsapp_e164 ?? null}
             availability={availability}
+            shippingZones={(storeMeta as any).shipping_zones}
           />
         </Suspense>
       )}
-    </div>
+    </>
   );
 }

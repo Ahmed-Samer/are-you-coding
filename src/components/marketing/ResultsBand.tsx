@@ -20,7 +20,7 @@ const RESULTS = [
   {
     icon: Users,
     value: "1,200+",
-    label: "operators currently selling on CoreWeb",
+    label: "operators currently selling on RentWebify",
   },
 ];
 

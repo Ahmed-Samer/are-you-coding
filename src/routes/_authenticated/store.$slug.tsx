@@ -21,32 +21,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Tenant = {
-  id: string;
-  slug: string;
-  name: string;
-  whatsapp_e164: string | null;
-  status: string;
-  logo_url?: string | null;
-  accent_color?: string | null;
-  seo_title?: string | null;
-  seo_description?: string | null;
-  og_image_url?: string | null;
-  currency?: string | null;
-  low_stock_threshold?: number | null;
-};
-type StoreCtx = { tenant: Tenant };
-const StoreContext = createContext<StoreCtx | null>(null);
-export function useStore() {
-  const ctx = useContext(StoreContext);
-  if (!ctx) throw new Error("StoreContext missing");
-  return ctx;
-}
+import { StoreContext } from "@/lib/store-context";
+import { getStorefrontUrl } from "@/lib/branding";
 
 export const Route = createFileRoute("/_authenticated/store/$slug")({
   head: ({ params }) => ({ meta: [{ title: `${params.slug} — Store admin` }] }),
-  beforeLoad: async ({ params }) => {
+  beforeLoad: async ({ params }: { params: { slug: string } }) => {
     if (!params.slug) throw redirect({ to: "/dashboard" });
+    return;
   },
   component: StoreLayout,
 });
@@ -63,7 +45,7 @@ const NAV = [
   { to: "/store/$slug/settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
-const SIDEBAR_KEY = "coreweb:store:sidebar-collapsed";
+const SIDEBAR_KEY = "rentwebify:store:sidebar-collapsed";
 
 function StoreLayout() {
   const { slug } = useParams({ from: "/_authenticated/store/$slug" });
@@ -201,14 +183,19 @@ function StoreLayout() {
                       <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">{data.tenant.name}</h1>
                     </div>
                   </div>
-                  <a
-                    href={`/?store=${data.tenant.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm hover:bg-accent shrink-0"
-                  >
-                    View storefront ↗
-                  </a>
+                  {(() => {
+                    const previewUrl = getStorefrontUrl(data.tenant.slug);
+                    return (
+                      <a
+                        href={previewUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm hover:bg-accent shrink-0"
+                      >
+                        View storefront ↗
+                      </a>
+                    );
+                  })()}
                 </header>
                 {/* Mobile/tablet tabs */}
                 <nav className="mb-6 flex gap-1 border-b border-border overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 lg:hidden">

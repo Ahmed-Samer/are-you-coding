@@ -5,25 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-/**
- * Screen 21 — Upload Proof step.
- *
- * Responsibilities (UX):
- *  - Dropzone + file picker (drag-and-drop)
- *  - Client-side type + size validation with distinct error copy
- *  - Best-effort EXIF strip + downscale for images via <canvas>
- *  - Selected-file preview (thumbnail or PDF chip) with remove/replace
- *  - Real upload progress via XHR PUT to a server-minted signed URL
- *  - Explicit copy per failure: wrong-type, oversize, network-failed,
- *    server-rejected, status-mismatch, mime-mismatch
- *  - Disables Submit until a valid file is selected
- *
- * The component is pure presentation — it depends on injected callbacks
- * for the two server-fn calls (`onRequestUploadUrl`, `onFinalize`) so it
- * stays trivially testable and so the route file keeps owning auth/cache
- * invalidation/navigation concerns.
- */
-
 const ALLOWED_MIMES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
 type AllowedMime = (typeof ALLOWED_MIMES)[number];
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -53,7 +34,7 @@ const ERROR_COPY: Record<Exclude<ProofErrorKind, null>, { title: string; body: s
   },
   "server-rejected": {
     title: "We couldn't accept this proof",
-    body: "Something went wrong on our side. Try again, or contact support if it persists.",
+    body: "Something went wrong on our side. Try again, or contact support on 01226399207 if it persists.",
   },
   "status-mismatch": {
     title: "This checkout already has a verified proof",
@@ -126,12 +107,6 @@ function parseServerError(err: unknown): {
   return { code: "TRANSIENT", message: err.message };
 }
 
-/**
- * Strip EXIF + best-effort downscale by re-encoding through a <canvas>.
- * Canvas re-encoding drops EXIF entirely. Skipped for PDFs and for tiny
- * images that don't need downscaling. Falls back to the original file on
- * any error — never blocks an upload because of best-effort post-processing.
- */
 async function preprocessImage(file: File): Promise<File> {
   if (file.type === "application/pdf") return file;
   if (typeof document === "undefined") return file;
@@ -142,9 +117,6 @@ async function preprocessImage(file: File): Promise<File> {
     const longest = Math.max(width, height);
     const scale = longest > MAX_LONG_EDGE ? MAX_LONG_EDGE / longest : 1;
     if (scale === 1 && file.size < 1.5 * 1024 * 1024) {
-      // Still re-encode tiny images so EXIF is stripped — but only if it
-      // doesn't bloat the file. We bail out for already-small files to
-      // avoid pointless work.
       bitmap.close?.();
       return file;
     }
@@ -274,19 +246,16 @@ export function UploadProofStep({
     setErrorDetail("");
     setProgress(0);
     try {
-      // Pre-process (EXIF strip + downscale, best-effort)
       setPhase("preprocess");
       const processed = await preprocessImage(file);
       const contentType = processed.type as AllowedMime;
 
-      // 1. Mint signed upload URL
       setPhase("signing");
       const { uploadUrl, storagePath } = await onRequestUploadUrl({
         contentType,
         byteSize: processed.size,
       });
 
-      // 2. Direct PUT to Storage
       setPhase("uploading");
       try {
         await uploadWithProgress(uploadUrl, processed, setProgress);
@@ -296,7 +265,6 @@ export function UploadProofStep({
         return;
       }
 
-      // 3. Finalize
       setPhase("finalising");
       try {
         await onFinalize({

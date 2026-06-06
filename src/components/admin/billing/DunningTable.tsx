@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getDunningQueue } from "@/lib/billing-admin.functions";
@@ -43,7 +42,7 @@ export function DunningTable() {
         <table className="w-full text-sm">
           <thead className="text-xs text-muted-foreground bg-muted/40">
             <tr>
-              <th className="text-left px-4 py-2 font-medium">Tenant</th>
+              <th className="text-left px-4 py-2 font-medium">User</th>
               <th className="text-left px-4 py-2 font-medium">Owner email</th>
               <th className="text-left px-4 py-2 font-medium">Plan</th>
               <th className="text-right px-4 py-2 font-medium">Price</th>
@@ -70,9 +69,9 @@ export function DunningTable() {
             {rows.map((r) => (
               <tr key={r.subscriptionId}>
                 <td className="px-4 py-2">
-                  <div className="font-medium">{r.tenantName ?? "—"}</div>
+                  <div className="font-medium text-xs">{r.ownerEmail ?? "—"}</div>
                   <div className="text-xs text-muted-foreground font-mono">
-                    /{r.tenantSlug ?? ""}
+                    {r.userId ? r.userId.slice(0, 8) + "…" : ""}
                   </div>
                 </td>
                 <td className="px-4 py-2 text-xs">{r.ownerEmail ?? "—"}</td>
@@ -92,13 +91,8 @@ export function DunningTable() {
                   </Badge>
                 </td>
                 <td className="px-4 py-2 text-right">
-                  <Button asChild size="sm" variant="outline">
-                    <Link
-                      to="/admin/tenants/$tenantId"
-                      params={{ tenantId: r.tenantId }}
-                    >
-                      Manage
-                    </Link>
+                  <Button size="sm" variant="outline" disabled>
+                    View
                   </Button>
                 </td>
               </tr>

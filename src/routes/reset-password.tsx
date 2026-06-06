@@ -19,22 +19,8 @@ import {
   PASSWORD_REQUIREMENT_MESSAGE,
 } from "@/lib/password-policy";
 
-// Recovery flow contract:
-//   - The Supabase client is configured with detectSessionInUrl: true
-//     (default), so it parses the URL fragment on load and emits
-//     PASSWORD_RECOVERY / SIGNED_IN through onAuthStateChange.
-//   - Supabase's recovery `redirectTo` is set by Forgot Password (Screen 08)
-//     to `${origin}/reset-password`; that origin MUST be whitelisted in
-//     Auth → URL Configuration. See PENDING_SQL_COMMANDS.sql.
-//   - Default recovery token TTL is 1 hour (configurable in Auth → Email
-//     Templates → "Recovery"); the invalid-state copy assumes this default.
-
 const searchSchema = z.object({
-  // Optional post-recovery destination, validated by `safeRedirect` before
-  // use (same-origin relative paths only). Falls back to `/dashboard`.
   redirect: z.string().optional(),
-  // Carried for parity with /signup and /forgot-password so future
-  // deep links can survive a round-trip through recovery.
   plan: z.string().max(64).optional(),
 });
 
@@ -65,10 +51,10 @@ const VERIFY_TIMEOUT_MS = 10_000;
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Set a new password — CoreWeb" },
+      { title: "Set a new password — RentWebify" },
       {
         name: "description",
-        content: "Set a new password for your CoreWeb account.",
+        content: "Set a new password for your RentWebify account.",
       },
       { name: "robots", content: "noindex, nofollow" },
     ],
@@ -80,11 +66,7 @@ export const Route = createFileRoute("/reset-password")({
 function ResetPasswordPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: "/reset-password" });
-  // safeRedirect strips any off-origin / protocol-relative paths; default
-  // is `/dashboard`, matching prior behavior when no `redirect` is given.
   const successDestination = safeRedirect(search.redirect) ?? "/dashboard";
-  // SSR-safe default: "verifying" renders identically on server and client,
-  // so hydration matches before the effect inspects window.location.hash.
   const [status, setStatus] = useState<RecoveryStatus>("verifying");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -105,7 +87,6 @@ function ResetPasswordPage() {
   const password = watch("password");
   const passwordReg = register("password");
 
-  // ── Recovery detection (client-only) ────────────────────────────────
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -119,12 +100,8 @@ function ResetPasswordPage() {
       return;
     }
     if (!looksLikeRecovery) {
-      // Catch the case where Supabase has already consumed the hash
-      // (e.g. after a fast navigation) before our listener subscribed.
       supabase.auth.getSession().then(({ data }) => {
         if (data.session) {
-          // We have a session but no recovery indicator — treat as invalid
-          // entry to /reset-password (user is already signed in elsewhere).
           setStatus("invalid");
         } else {
           setStatus("invalid");
@@ -133,13 +110,11 @@ function ResetPasswordPage() {
       return;
     }
 
-    // Subscribe FIRST so we don't miss the event under edge hydration.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         setStatus((s) => (s === "verifying" ? "ready" : s));
-        // Scrub the fragment so a refresh doesn't re-process a used token.
         if (window.location.hash) {
           window.history.replaceState(
             null,
@@ -150,8 +125,6 @@ function ResetPasswordPage() {
       }
     });
 
-    // Race-condition guard: if Supabase consumed the hash before we
-    // subscribed, getSession() will already return the session.
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
         setStatus((s) => (s === "verifying" ? "ready" : s));
@@ -175,10 +148,8 @@ function ResetPasswordPage() {
     };
   }, []);
 
-  // Autofocus on ready.
   useEffect(() => {
     if (status === "ready") {
-      // setFocus from RHF, falls back to direct ref.
       try {
         setFocus("password");
       } catch {
@@ -187,7 +158,6 @@ function ResetPasswordPage() {
     }
   }, [status, setFocus]);
 
-  // Lightweight Tab focus-trap inside the form container.
   useEffect(() => {
     if (status !== "ready") return;
     const node = containerRef.current;
@@ -219,7 +189,6 @@ function ResetPasswordPage() {
     const { error } = await supabase.auth.updateUser({ password: v.password });
     if (error) {
       const raw = (error.message ?? "").toLowerCase();
-      // Token expired between page load and submit, or session lost.
       if (
         raw.includes("auth session missing") ||
         raw.includes("invalid_grant") ||
@@ -240,7 +209,6 @@ function ResetPasswordPage() {
     navigate({ to: successDestination as string, replace: true });
   });
 
-  // Screen-reader landmark copy per state.
   const srStatus =
     status === "ready" || status === "submitting"
       ? "New password form"
@@ -268,7 +236,6 @@ function ResetPasswordPage() {
             : "Choose a strong password you don't use anywhere else."}
         </p>
 
-        {/* Reserved-height submit-error region — avoids CLS. */}
         <div role="alert" aria-live="polite" className="mt-6 min-h-[2.5rem]">
           {submitError && status !== "invalid" && (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">

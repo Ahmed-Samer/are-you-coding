@@ -3,47 +3,34 @@ import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@ta
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Edit2, Trash2, Smartphone, Building, Zap, CreditCard } from "lucide-react";
+
 import { AdminShell } from "@/components/admin/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
-import {
-  listPaymentMethodsAdmin,
-  upsertPaymentMethod,
-  togglePaymentMethodActive,
-  deletePaymentMethod,
-} from "@/lib/admin.functions";
 
-type Method = {
-  id: string;
-  kind: "instapay" | "vodafone_cash" | "bank_transfer";
-  label: string;
-  account_identifier: string | null;
-  account_holder: string | null;
-  instructions: string | null;
-  sort_order: number;
-  is_active: boolean;
-};
-
-type Draft = {
-  id?: string;
-  kind: Method["kind"];
-  label: string;
-  account_identifier: string;
-  instructions: string;
-  is_active: boolean;
-};
+import { listPaymentMethodsAdmin, upsertPaymentMethod, togglePaymentMethodActive, deletePaymentMethod } from "@/lib/admin.functions";
 
 const methodsQuery = queryOptions({
   queryKey: ["admin", "payment-methods"],
@@ -51,167 +38,288 @@ const methodsQuery = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/admin/payment-methods")({
-  head: () => ({ meta: [{ title: "Admin — Payment methods" }] }),
+  head: () => ({ meta: [{ title: "Admin — Payment Methods" }] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(methodsQuery),
-  component: PaymentMethodsPage,
+  component: AdminPaymentMethodsPage,
 });
 
-function blank(): Draft {
-  return { kind: "instapay", label: "", account_identifier: "", instructions: "", is_active: true };
-}
+type MethodFormState = {
+  id?: string;
+  kind: "instapay" | "vodafone_cash" | "bank_transfer";
+  label: string;
+  accountIdentifier: string;
+  accountHolder: string;
+  instructions: string;
+  sortOrder: number;
+  isActive: boolean;
+};
 
-function PaymentMethodsPage() {
+const defaultFormState: MethodFormState = {
+  kind: "vodafone_cash",
+  label: "",
+  accountIdentifier: "",
+  accountHolder: "",
+  instructions: "",
+  sortOrder: 0,
+  isActive: true,
+};
+
+export function AdminPaymentMethodsPage() {
   const { data } = useSuspenseQuery(methodsQuery);
-  const methods = (data.methods ?? []) as Method[];
   const qc = useQueryClient();
+
   const upsertFn = useServerFn(upsertPaymentMethod);
   const toggleFn = useServerFn(togglePaymentMethodActive);
-  const removeFn = useServerFn(deletePaymentMethod);
+  const deleteFn = useServerFn(deletePaymentMethod);
 
-  const upsert = useMutation({
-    mutationFn: (input: any) => upsertFn({ data: input }),
-    onSuccess: () => { toast.success("Payment method saved"); qc.invalidateQueries({ queryKey: ["admin", "payment-methods"] }); },
+  const methods = data.methods ?? [];
+
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [formData, setFormData] = useState<MethodFormState>(defaultFormState);
+  const [methodToDelete, setMethodToDelete] = useState<{ id: string; label: string } | null>(null);
+
+  const upsertMut = useMutation({
+    mutationFn: (payload: MethodFormState) => upsertFn({ data: payload }),
+    onSuccess: () => {
+      toast.success("Payment method saved successfully");
+      setIsSheetOpen(false);
+      qc.invalidateQueries({ queryKey: ["admin", "payment-methods"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
-  const toggle = useMutation({
+
+  const toggleMut = useMutation({
     mutationFn: (input: { id: string; isActive: boolean }) => toggleFn({ data: input }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "payment-methods"] }),
+    onSuccess: () => {
+      toast.success("Method visibility updated");
+      qc.invalidateQueries({ queryKey: ["admin", "payment-methods"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
-  const remove = useMutation({
-    mutationFn: (id: string) => removeFn({ data: { id } }),
-    onSuccess: () => { toast.success("Removed"); qc.invalidateQueries({ queryKey: ["admin", "payment-methods"] }); },
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteFn({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Payment method deleted");
+      setMethodToDelete(null);
+      qc.invalidateQueries({ queryKey: ["admin", "payment-methods"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const [editing, setEditing] = useState<Draft | null>(null);
-  const [removing, setRemoving] = useState<Method | null>(null);
+  const handleOpenEdit = (method?: any) => {
+    if (method) {
+      setFormData({
+        id: method.id,
+        kind: method.kind,
+        label: method.label,
+        accountIdentifier: method.account_identifier ?? "",
+        accountHolder: method.account_holder ?? "",
+        instructions: method.instructions ?? "",
+        sortOrder: method.sort_order,
+        isActive: method.is_active,
+      });
+    } else {
+      setFormData(defaultFormState);
+    }
+    setIsSheetOpen(true);
+  };
 
-  function openEdit(m: Method) {
-    setEditing({
-      id: m.id,
-      kind: m.kind,
-      label: m.label,
-      account_identifier: m.account_identifier ?? "",
-      instructions: m.instructions ?? "",
-      is_active: m.is_active,
-    });
-  }
-
-  function save() {
-    if (!editing) return;
-    upsert.mutate(
-      {
-        id: editing.id,
-        kind: editing.kind,
-        label: editing.label,
-        accountIdentifier: editing.account_identifier || undefined,
-        instructions: editing.instructions || undefined,
-        isActive: editing.is_active,
-        sortOrder: 0,
-      },
-      { onSuccess: () => setEditing(null) },
-    );
-  }
+  const getMethodIcon = (kind: string) => {
+    switch (kind) {
+      case "vodafone_cash": return <Smartphone className="size-5 text-red-500" />;
+      case "instapay": return <Zap className="size-5 text-purple-500" />;
+      case "bank_transfer": return <Building className="size-5 text-blue-500" />;
+      default: return <CreditCard className="size-5 text-muted-foreground" />;
+    }
+  };
 
   return (
     <AdminShell
-      title="Payment methods"
-      description="Manual checkout instructions presented to tenants when activating their subscription."
-      breadcrumbs={[{ label: "Payment methods" }]}
+      title="Payment Methods"
+      description="Configure manual payment accounts displayed to users during checkout."
+      breadcrumbs={[{ label: "Payment Methods" }]}
       actions={
-        <Button size="sm" onClick={() => setEditing(blank())}>
-          <Plus className="size-4" /> New method
+        <Button onClick={() => handleOpenEdit()}>
+          <Plus className="size-4 mr-2" /> Add Method
         </Button>
       }
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {methods.length === 0 && (
-          <div className="col-span-full rounded-xl border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
-            No payment methods yet.
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {methods.map((method: any) => (
+          <Card key={method.id} className={`shadow-sm border-border flex flex-col relative overflow-hidden transition-all ${!method.is_active ? 'opacity-70 bg-muted/30' : ''}`}>
+            {!method.is_active && (
+              <div className="absolute top-0 right-0 bg-secondary px-3 py-1 text-[10px] font-semibold tracking-widest uppercase rounded-bl-lg">
+                Hidden
+              </div>
+            )}
+            <CardHeader className="pb-4">
+              <div className="flex justify-between items-start mb-2">
+                <div className="size-10 rounded-md bg-muted flex items-center justify-center border border-border">
+                  {getMethodIcon(method.kind)}
+                </div>
+                <Badge variant="outline" className="font-mono text-[10px]">Order: {method.sort_order}</Badge>
+              </div>
+              <CardTitle className="text-lg">{method.label}</CardTitle>
+              <CardDescription className="capitalize text-xs font-medium">
+                {method.kind.replace("_", " ")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 space-y-3">
+              <div className="text-sm">
+                <p className="text-xs text-muted-foreground mb-0.5">Account / Number</p>
+                <p className="font-mono font-medium">{method.account_identifier || "—"}</p>
+              </div>
+              <div className="text-sm">
+                <p className="text-xs text-muted-foreground mb-0.5">Account Holder</p>
+                <p className="font-medium">{method.account_holder || "—"}</p>
+              </div>
+              {method.instructions && (
+                <div className="text-sm pt-2 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-1">Instructions</p>
+                  <p className="text-xs text-foreground/80 line-clamp-2">{method.instructions}</p>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="pt-4 border-t border-border bg-muted/10 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Switch 
+                  checked={method.is_active} 
+                  onCheckedChange={(v) => toggleMut.mutate({ id: method.id, isActive: v })} 
+                  disabled={toggleMut.isPending}
+                />
+                <span className="text-xs text-muted-foreground font-medium">Active</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => handleOpenEdit(method)}>
+                  <Edit2 className="size-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => setMethodToDelete({ id: method.id, label: method.label })}>
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            </CardFooter>
+          </Card>
+        ))}
+
+        {!methods.length && (
+          <div className="col-span-full py-16 flex flex-col items-center justify-center border border-dashed border-border rounded-xl bg-card text-center">
+            <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <Plus className="size-6 text-primary" />
+            </div>
+            <h3 className="text-lg font-semibold">No payment methods</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mt-1 mb-6">
+              Add your Vodafone Cash, InstaPay, or Bank Transfer details to receive payments.
+            </p>
+            <Button onClick={() => handleOpenEdit()}>Add Payment Method</Button>
           </div>
         )}
-        {methods.map((m) => (
-          <div key={m.id} className="rounded-xl border border-border bg-card p-5">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{m.label}</h3>
-                  <Badge variant="outline" className="capitalize">{m.kind.replace("_", " ")}</Badge>
-                </div>
-                <div className="mt-1 text-sm text-muted-foreground font-mono">{m.account_identifier ?? "—"}</div>
-              </div>
-              <Switch
-                checked={m.is_active}
-                onCheckedChange={(v) => toggle.mutate({ id: m.id, isActive: v })}
-              />
-            </div>
-            <p className="mt-3 text-sm text-muted-foreground line-clamp-2">{m.instructions ?? ""}</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => openEdit(m)}>
-                <Pencil className="size-4" /> Edit
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setRemoving(m)}>
-                <Trash2 className="size-4" /> Remove
-              </Button>
-            </div>
-          </div>
-        ))}
       </div>
 
-      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editing?.id ? "Edit" : "New"} payment method</DialogTitle>
-          </DialogHeader>
-          {editing && (
-            <div className="space-y-3">
-              <div>
-                <Label htmlFor="pm-label">Label</Label>
-                <Input id="pm-label" value={editing.label} onChange={(e) => setEditing({ ...editing, label: e.target.value })} />
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent className="sm:max-w-md w-full overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>{formData.id ? "Edit Payment Method" : "Add Payment Method"}</SheetTitle>
+            <SheetDescription>Configure where and how users should send their payments.</SheetDescription>
+          </SheetHeader>
+          
+          <form onSubmit={(e) => { e.preventDefault(); upsertMut.mutate(formData); }} className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Type</label>
+              <Select 
+                value={formData.kind} 
+                onValueChange={(v: any) => setFormData({...formData, kind: v})}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vodafone_cash">Vodafone Cash</SelectItem>
+                  <SelectItem value="instapay">InstaPay</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Display Label</label>
+              <Input 
+                required 
+                placeholder="e.g. Vodafone Cash (Primary)" 
+                value={formData.label} 
+                onChange={e => setFormData({...formData, label: e.target.value})} 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Account Identifier / Number</label>
+              <Input 
+                placeholder="e.g. 01000000000 or username@instapay" 
+                value={formData.accountIdentifier} 
+                onChange={e => setFormData({...formData, accountIdentifier: e.target.value})} 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Account Holder Name</label>
+              <Input 
+                placeholder="e.g. Ahmed Samir" 
+                value={formData.accountHolder} 
+                onChange={e => setFormData({...formData, accountHolder: e.target.value})} 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Customer Instructions</label>
+              <Textarea 
+                placeholder="e.g. Please transfer the exact amount and upload the screenshot..." 
+                value={formData.instructions} 
+                onChange={e => setFormData({...formData, instructions: e.target.value})} 
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg border border-border mt-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Sort Order</label>
+                <Input 
+                  type="number" 
+                  min={0} 
+                  value={formData.sortOrder} 
+                  onChange={e => setFormData({...formData, sortOrder: parseInt(e.target.value) || 0})} 
+                />
               </div>
-              <div>
-                <Label htmlFor="pm-kind">Kind</Label>
-                <Select value={editing.kind} onValueChange={(v) => setEditing({ ...editing, kind: v as Method["kind"] })}>
-                  <SelectTrigger id="pm-kind"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="instapay">InstaPay</SelectItem>
-                    <SelectItem value="vodafone_cash">Vodafone Cash</SelectItem>
-                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="pm-acct">Account identifier</Label>
-                <Input id="pm-acct" value={editing.account_identifier} onChange={(e) => setEditing({ ...editing, account_identifier: e.target.value })} />
-              </div>
-              <div>
-                <Label htmlFor="pm-inst">Instructions</Label>
-                <Textarea id="pm-inst" rows={4} value={editing.instructions} onChange={(e) => setEditing({ ...editing, instructions: e.target.value })} />
+              <div className="space-y-1.5 flex flex-col justify-center">
+                <label className="text-sm font-medium">Visibility</label>
+                <div className="flex items-center gap-2 pt-1">
+                  <Switch 
+                    checked={formData.isActive} 
+                    onCheckedChange={v => setFormData({...formData, isActive: v})} 
+                  />
+                  <span className="text-sm text-muted-foreground">{formData.isActive ? "Active" : "Hidden"}</span>
+                </div>
               </div>
             </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button disabled={!editing?.label || upsert.isPending} onClick={save}>
-              Save method
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+            <SheetFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsSheetOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={upsertMut.isPending}>
+                {upsertMut.isPending ? "Saving..." : "Save Method"}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
 
       <ConfirmDialog
-        open={!!removing}
-        onOpenChange={(o) => !o && setRemoving(null)}
-        title={`Remove ${removing?.label}?`}
-        description="Tenants will no longer see this method at checkout."
-        confirmLabel="Remove"
-        destructive
-        onConfirm={() => {
-          if (!removing) return;
-          remove.mutate(removing.id);
-          setRemoving(null);
-        }}
+        open={!!methodToDelete}
+        onOpenChange={(v) => !v && setMethodToDelete(null)}
+        title="Delete Payment Method?"
+        description={`Are you sure you want to permanently delete "${methodToDelete?.label}"? This will hide it from users during checkout.`}
+        confirmLabel="Yes, Delete"
+        destructive={true}
+        loading={deleteMut.isPending}
+        onConfirm={() => deleteMut.mutate(methodToDelete!.id)}
       />
     </AdminShell>
   );

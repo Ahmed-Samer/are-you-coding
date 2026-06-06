@@ -89,7 +89,7 @@ export function AdminShell({
               <Shield className="size-4" />
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold tracking-tight">CoreWeb</span>
+              <span className="text-sm font-semibold tracking-tight">RentWebify</span>
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Admin Console</span>
             </div>
           </div>

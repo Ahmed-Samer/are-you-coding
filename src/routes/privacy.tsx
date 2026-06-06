@@ -4,16 +4,16 @@ import { PlatformShell } from "@/components/shells/PlatformShell";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy Policy — CoreWeb" },
+      { title: "Privacy Policy — RentWebify" },
       {
         name: "description",
         content:
-          "How CoreWeb collects, uses, and protects your data — clear, plain-language privacy practices for our hosted storefront platform.",
+          "How RentWebify collects, uses, and protects your data — clear, plain-language privacy practices for our hosted storefront platform.",
       },
-      { property: "og:title", content: "Privacy Policy — CoreWeb" },
+      { property: "og:title", content: "Privacy Policy — RentWebify" },
       {
         property: "og:description",
-        content: "Plain-language privacy practices for the CoreWeb platform.",
+        content: "Plain-language privacy practices for the RentWebify platform.",
       },
     ],
     links: [{ rel: "canonical", href: "/privacy" }],
@@ -79,7 +79,7 @@ function PrivacyPage() {
           <div>
             <h2 className="text-xl font-semibold">6. Contact</h2>
             <p className="mt-2 text-muted-foreground">
-              Questions about this policy? Reach us at privacy@coreweb.app.
+              Questions about this policy? Reach us at privacy@rentwebify.com.
             </p>
           </div>
         </section>

@@ -10,13 +10,6 @@ import { PlatformShell } from "@/components/shells/PlatformShell";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
-// ----------------------------------------------------------------------------
-// Search-param contract
-// ----------------------------------------------------------------------------
-// Tolerant of every carrier produced by Screens 06–09, plus the OAuth error
-// reporting Supabase appends. Every field is fallback()-wrapped so a malformed
-// query string can never crash the callback route.
-
 const searchSchema = z.object({
   next: fallback(z.string().optional(), undefined),
   redirect: fallback(z.string().optional(), undefined),
@@ -45,17 +38,13 @@ function allowedNext(raw: string | undefined): string | null {
 export const Route = createFileRoute("/auth/callback")({
   head: () => ({
     meta: [
-      { title: "Signing you in… — CoreWeb" },
+      { title: "Signing you in… — RentWebify" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   validateSearch: zodValidator(searchSchema),
   component: AuthCallbackPage,
 });
-
-// ----------------------------------------------------------------------------
-// State machine
-// ----------------------------------------------------------------------------
 
 type CallbackStatus =
   | "exchanging"
@@ -96,13 +85,11 @@ function AuthCallbackPage() {
 
   const [status, setStatus] = useState<CallbackStatus>("exchanging");
   const [errorDescription, setErrorDescription] = useState<string | null>(null);
-  // Captured pre-hash-scrub so the expired-state CTAs can route correctly.
   const [recoveryType, setRecoveryType] = useState<"signup" | "recovery" | "magiclink" | "invite" | "oauth" | "unknown">(
     "unknown",
   );
   const [retryKey, setRetryKey] = useState(0);
 
-  // Stable handle to abort the timer/listener on unmount or retry.
   const cancelledRef = useRef(false);
 
   useEffect(() => {
@@ -110,7 +97,6 @@ function AuthCallbackPage() {
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
     let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // ---- 1. Inspect URL for error / type BEFORE scrubbing the hash ----
     const hashParams = typeof window !== "undefined" ? parseHash(window.location.hash) : new URLSearchParams();
     const hashError = hashParams.get("error") ?? undefined;
     const hashErrorCode = hashParams.get("error_code") ?? undefined;
@@ -119,11 +105,6 @@ function AuthCallbackPage() {
     if (hashType === "signup" || hashType === "recovery" || hashType === "magiclink" || hashType === "invite") {
       setRecoveryType(hashType);
     }
-    // No `else` branch: when the hash carries no `type=…` (e.g. a fully
-    // exchanged `?code=` session, or an email-confirmation that has already
-    // been consumed), we leave `recoveryType` at its initial "unknown"
-    // value rather than mislabeling the origin as "oauth". The error CTAs
-    // read neutrally in that case.
 
     const inboundError = search.error ?? hashError;
     const inboundErrorCode = search.error_code ?? hashErrorCode;
@@ -137,31 +118,29 @@ function AuthCallbackPage() {
       };
     }
 
-    // ---- 2. Branch helper, called once a session is detected ----
     const branch = async () => {
       if (cancelledRef.current) return;
       setStatus("branching");
-      // Scrub the URL hash so a refresh doesn't try to re-consume the token.
       if (typeof window !== "undefined" && window.location.hash) {
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
       }
 
-      // (a) Explicit, allow-listed `next`/`redirect` wins.
-      //
-      // Note on the allow-list (`ALLOWED_NEXT_PREFIXES`): any `redirect=`
-      // targeting a surface NOT in that list (e.g. `/admin`) is silently
-      // dropped here and we fall back to `/dashboard` / `/onboarding`. This
-      // is intentional defense-in-depth against open-redirect abuse on the
-      // OAuth round-trip; widen the allow-list if a new authenticated
-      // landing surface becomes a legitimate `redirect=` target.
       const explicit = allowedNext(search.next ?? search.redirect);
       if (explicit) {
+        // Preserve the plan param when the explicit destination is the
+        // onboarding flow, otherwise the user's selected plan is lost across
+        // the auth bounce.
+        const wantsPlan =
+          (explicit === "/onboarding" || explicit.startsWith("/onboarding?")) &&
+          !!search.plan;
+        const target = wantsPlan
+          ? `${explicit}${explicit.includes("?") ? "&" : "?"}plan=${encodeURIComponent(search.plan as string)}`
+          : explicit;
         setStatus("redirecting");
-        navigate({ to: explicit as string, replace: true });
+        navigate({ to: target as string, replace: true });
         return;
       }
 
-      // (b) Server-validated store-ownership branching.
       let target = "/dashboard";
       try {
         const { destination } = await getDestination();
@@ -179,14 +158,6 @@ function AuthCallbackPage() {
       navigate({ to: target as string, replace: true });
     };
 
-    // ---- 3. Bounded poll until a session is detected ----
-    // Per the integration guidance, `onAuthStateChange` is owned by
-    // `auth-context.tsx` as the single root-level listener. Subscribing
-    // here would race that listener's `router.invalidate()` against this
-    // route's `navigate({ replace: true })`, producing a transient
-    // duplicate render on the destination route. The polling cadence
-    // (250 ms) is well below human perception and the immediate
-    // `getSession()` check usually short-circuits it.
     const trySession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
@@ -196,10 +167,8 @@ function AuthCallbackPage() {
       return false;
     };
 
-    // Immediate check (covers detectSessionInUrl having already exchanged).
     void trySession().then((found) => {
       if (found || cancelledRef.current) return;
-      // Bounded poll as the backstop.
       const poll = async () => {
         if (cancelledRef.current) return;
         const found = await trySession();
@@ -211,7 +180,6 @@ function AuthCallbackPage() {
 
     deadlineTimer = setTimeout(() => {
       if (cancelledRef.current) return;
-      // If we're still exchanging after the deadline, time out.
       setStatus((curr) => (curr === "exchanging" ? "error_timeout" : curr));
     }, EXCHANGE_TIMEOUT_MS);
 
@@ -220,8 +188,6 @@ function AuthCallbackPage() {
       if (pollTimer) clearTimeout(pollTimer);
       if (deadlineTimer) clearTimeout(deadlineTimer);
     };
-    // retryKey is the manual retry trigger; navigate/getDestination are stable refs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryKey]);
 
   return (
@@ -277,7 +243,6 @@ function ErrorView({
   search: { next?: string; redirect?: string; plan?: "starter" | "growth" | "scale" };
   onRetry: () => void;
 }) {
-  // Preserve next/plan back into Login so the user doesn't lose intent.
   const loginSearch = useMemo(() => {
     const out: Record<string, string> = {};
     const safeNext = allowedNext(search.next ?? search.redirect);
@@ -355,7 +320,6 @@ function ErrorView({
     );
   }
 
-  // error_unknown
   return (
     <div className="flex flex-1 flex-col gap-4" role="alert">
       <div>

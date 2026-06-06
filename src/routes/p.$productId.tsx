@@ -206,7 +206,7 @@ function ProductPageInner({
         onOpenCart={() => {
           // Cart drawer lives on the storefront index route; send shoppers
           // back home with the cart open via a hash flag.
-          if (typeof window !== "undefined") window.location.href = "/?cart=1";
+          if (typeof window !== "undefined") window.location.href = "/?cart=open";
         }}
         isOpen={availability.isOpen}
       />

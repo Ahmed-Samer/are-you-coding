@@ -37,48 +37,55 @@ export function HeroSlider({
   const slide = slides[idx] ?? { title: fallbackName };
   const heroSrcSet = buildSrcSet(slide.image, HERO_WIDTHS, "webp");
   return (
-    <section className="border-b border-border relative overflow-hidden">
-      {slide.image && (
-        <div className="absolute inset-0 opacity-10" aria-hidden>
-          {/* Real <img> with explicit dimensions + responsive srcset so the
-              hero contributes to LCP without layout shift. Only the first
-              slide is high-priority; later slides lazy-load. */}
-          <img
-            src={slide.image}
-            srcSet={heroSrcSet}
-            sizes="100vw"
-            alt=""
-            width={1600}
-            height={700}
-            decoding="async"
-            loading={idx === 0 ? "eager" : "lazy"}
-            // @ts-expect-error fetchpriority is a valid HTML attribute
-            fetchpriority={idx === 0 ? "high" : "low"}
-            className="size-full object-cover"
-          />
-        </div>
-      )}
-      <div className="mx-auto max-w-6xl px-6 py-12 sm:py-16 relative z-10 aspect-[16/7] sm:aspect-auto">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">Shop</p>
-        <h1 className="mt-1 text-3xl sm:text-4xl font-semibold tracking-tight" style={accent ? { color: accent } : undefined}>
-          {slide.title}
-        </h1>
-        {slide.subtitle && <p className="mt-2 text-sm text-muted-foreground max-w-xl">{slide.subtitle}</p>}
-        {slides.length > 1 && (
-          <div className="mt-6 flex gap-1.5" role="tablist" aria-label="Hero slides">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setIdx(i)}
-                aria-label={`Show slide ${i + 1}`}
-                aria-selected={i === idx}
-                role="tab"
-                className={`h-1 rounded-full transition-all ${i === idx ? "w-6" : "w-2"}`}
-                style={{ background: i === idx ? (accent || "hsl(var(--foreground))") : "hsl(var(--border))" }}
-              />
-            ))}
+    <section className="relative overflow-hidden group">
+      {slide.image ? (
+        <>
+          <div className="absolute inset-0 z-0">
+            <img
+              src={slide.image}
+              srcSet={heroSrcSet}
+              sizes="100vw"
+              alt=""
+              width={1600}
+              height={700}
+              decoding="async"
+              loading={idx === 0 ? "eager" : "lazy"}
+              // @ts-expect-error fetchpriority is a valid HTML attribute
+              fetchpriority={idx === 0 ? "high" : "low"}
+              className="size-full object-cover transition-transform duration-[10s] ease-out group-hover:scale-105"
+            />
           </div>
-        )}
+          {/* Subtle gradient overlay for better text contrast without making it too dark */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent z-0" aria-hidden />
+        </>
+      ) : (
+        <div className="absolute inset-0 bg-muted/30 z-0" aria-hidden />
+      )}
+      
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-32 relative z-10 flex flex-col justify-end min-h-[400px] sm:min-h-[500px]">
+        <div className="max-w-2xl backdrop-blur-md bg-background/60 p-6 sm:p-10 rounded-2xl border border-border/50 shadow-2xl animate-in slide-in-from-bottom-8 fade-in duration-700">
+          <p className="text-xs sm:text-sm uppercase tracking-[0.2em] font-semibold text-muted-foreground mb-3">Shop Collection</p>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1]" style={accent ? { color: accent } : undefined}>
+            {slide.title}
+          </h1>
+          {slide.subtitle && <p className="mt-4 text-base sm:text-lg text-muted-foreground/90 max-w-xl leading-relaxed">{slide.subtitle}</p>}
+          
+          {slides.length > 1 && (
+            <div className="mt-8 flex gap-2 items-center" role="tablist" aria-label="Hero slides">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setIdx(i)}
+                  aria-label={`Show slide ${i + 1}`}
+                  aria-selected={i === idx}
+                  role="tab"
+                  className={`h-1.5 rounded-full transition-all duration-300 ${i === idx ? "w-8 bg-foreground" : "w-2 bg-foreground/20 hover:bg-foreground/40"}`}
+                  style={i === idx && accent ? { background: accent } : undefined}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -98,15 +105,17 @@ export function CatChip({
   return (
     <button
       onClick={onClick}
-      className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors"
+      className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 ${
+        active ? "shadow-md scale-105" : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground"
+      }`}
       style={
         active
-          ? { background: accent || "hsl(var(--foreground))", color: "#fff", borderColor: accent || "hsl(var(--foreground))" }
+          ? { background: accent || "hsl(var(--foreground))", color: "#fff" }
           : undefined
       }
       data-active={active || undefined}
     >
-      <span className={active ? "" : "text-muted-foreground hover:text-foreground"}>{children}</span>
+      <span>{children}</span>
     </button>
   );
 }
@@ -125,11 +134,11 @@ export const ProductCard = memo(function ProductCard({
   accent: string | null;
 }) {
   return (
-    <div className="text-left group relative">
+    <div className="text-left group relative flex flex-col animate-in fade-in zoom-in-95 duration-500">
       <button
         onClick={() => onSelect(product)}
         aria-label={`View ${product.name}`}
-        className="block w-full aspect-square rounded-md bg-muted overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+        className="block w-full aspect-[4/5] rounded-2xl bg-muted overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all duration-500 group-hover:shadow-xl group-hover:-translate-y-1"
       >
         {product.image_url ? (
           <img
@@ -142,13 +151,14 @@ export const ProductCard = memo(function ProductCard({
             // @ts-expect-error fetchpriority is a valid HTML attribute
             fetchpriority="low"
             width={600}
-            height={600}
-            className="size-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+            height={750}
+            className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
           />
         ) : (
-          <div className="size-full flex items-center justify-center text-muted-foreground text-xs">No image</div>
+          <div className="size-full flex items-center justify-center text-muted-foreground text-xs bg-muted/50">No image</div>
         )}
       </button>
+      
       <button
         type="button"
         onClick={(e) => {
@@ -157,14 +167,15 @@ export const ProductCard = memo(function ProductCard({
         }}
         aria-label={`Quick add ${product.name}`}
         disabled={product.stock <= 0}
-        className="absolute top-2 right-2 inline-flex items-center justify-center size-9 rounded-full bg-background/90 backdrop-blur border border-border shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+        className="absolute top-3 right-3 inline-flex items-center justify-center size-10 rounded-full bg-background/95 backdrop-blur-md shadow-sm opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 focus-visible:opacity-100 focus-visible:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-110"
         style={{ color: accent || undefined }}
       >
-        <Plus className="size-4" />
+        <Plus className="size-5" />
       </button>
-      <div className="mt-3">
-        <h3 className="text-sm font-medium line-clamp-1">{product.name}</h3>
-        <p className="text-sm text-muted-foreground tabular-nums mt-0.5">
+
+      <div className="mt-4 px-1">
+        <h3 className="text-base font-medium line-clamp-1 group-hover:text-foreground transition-colors">{product.name}</h3>
+        <p className="text-sm text-muted-foreground font-medium tabular-nums mt-1">
           {formatPrice(product.price_cents, product.currency ?? currency)}
         </p>
       </div>
@@ -174,12 +185,12 @@ export const ProductCard = memo(function ProductCard({
 
 export function ProductSkeletonGrid({ count = 8 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-8">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-10">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i}>
-          <Skeleton className="aspect-square w-full rounded-md" />
-          <Skeleton className="mt-3 h-4 w-3/4" />
-          <Skeleton className="mt-2 h-3 w-1/3" />
+        <div key={i} className="animate-pulse">
+          <Skeleton className="aspect-[4/5] w-full rounded-2xl bg-muted/60" />
+          <Skeleton className="mt-4 h-5 w-3/4 rounded-md" />
+          <Skeleton className="mt-2 h-4 w-1/3 rounded-md" />
         </div>
       ))}
     </div>
@@ -207,7 +218,7 @@ export function FeaturedSection({
           <Sparkles className="size-3.5" /> Featured
         </h2>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-10">
         {items.slice(0, 4).map((p: any) => (
           <ProductCard
             key={`feat-${p.id}`}

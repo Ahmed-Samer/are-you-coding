@@ -27,10 +27,10 @@ const RESEND_COOLDOWN_SECONDS = 60;
 export const Route = createFileRoute("/forgot-password")({
   head: () => ({
     meta: [
-      { title: "Reset your password — CoreWeb" },
+      { title: "Reset your password — RentWebify" },
       {
         name: "description",
-        content: "Request a password reset link for your CoreWeb account.",
+        content: "Request a password reset link for your RentWebify account.",
       },
       { name: "robots", content: "noindex, nofollow" },
     ],
@@ -42,10 +42,6 @@ export const Route = createFileRoute("/forgot-password")({
 function ForgotPasswordPage() {
   const search = useSearch({ from: "/forgot-password" });
   const redirectTo = safeRedirect(search.redirect);
-  // `/login`'s validateSearch only accepts `redirect`, so we forward only
-  // that on outbound links to stay type-safe. The route still accepts
-  // `plan` so deeper auth-funnel handoffs (e.g. /signup?plan=...) survive
-  // a round-trip through recovery without being dropped from the URL.
   const linkSearch = redirectTo ? { redirect: redirectTo } : undefined;
 
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
@@ -69,12 +65,10 @@ function ForgotPasswordPage() {
   });
   const emailReg = register("email");
 
-  // Autofocus the email field on mount (form view only).
   useEffect(() => {
     if (!submittedEmail) emailInputRef.current?.focus();
   }, [submittedEmail]);
 
-  // Lightweight focus trap mirroring login/signup screens.
   useEffect(() => {
     const node = containerRef.current;
     if (!node) return;
@@ -99,7 +93,6 @@ function ForgotPasswordPage() {
     return () => node.removeEventListener("keydown", handler);
   }, [submittedEmail]);
 
-  // Cooldown ticker.
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const t = setInterval(
@@ -121,9 +114,6 @@ function ForgotPasswordPage() {
         data: { email: v.email, redirectTo: buildRedirectTo() },
       });
     } catch (e) {
-      // Never branch on existence — mapAuthError neutralizes throttle /
-      // transport errors and the server fn already suppresses Supabase
-      // recovery errors.
       setFormError(mapAuthError(e));
       return;
     }
@@ -141,8 +131,6 @@ function ForgotPasswordPage() {
       });
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (e) {
-      // Surface inline (no toasts) — and keep the user in the success
-      // view so we never reveal whether prior attempts hit a real account.
       setFormError(mapAuthError(e));
     } finally {
       setResendBusy(false);
@@ -153,7 +141,6 @@ function ForgotPasswordPage() {
     setSubmittedEmail(null);
     setResendCooldown(0);
     setFormError(null);
-    // Focus restoration is handled by the autofocus effect.
   };
 
   return (
@@ -172,7 +159,6 @@ function ForgotPasswordPage() {
             : "Enter the email tied to your account and we'll send a reset link."}
         </p>
 
-        {/* Persistent inline error region — reserved height to avoid CLS. */}
         <div role="alert" aria-live="polite" className="mt-6 min-h-[2.5rem]">
           {formError && (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">

@@ -11,11 +11,13 @@ function createSupabaseAdminClient() {
     ((import.meta.env as Record<string, string | undefined>).SUPABASE_SERVICE_ROLE_KEY);
 
   if (!SUPABASE_URL) {
-    throw new Error('Missing SUPABASE_URL / VITE_SUPABASE_URL env var.');
+    const message = 'Missing SUPABASE_URL or VITE_SUPABASE_URL env var. Please add it to your .env file.';
+    console.error(`[RentWebify Server] ${message}`);
+    throw new Error(message);
   }
   if (!SERVICE_ROLE_KEY) {
-    const message = `Missing SUPABASE_SERVICE_ROLE_KEY env var. Add it in Project Settings → Secrets.`;
-    console.error(`[Supabase] ${message}`);
+    const message = `Missing SUPABASE_SERVICE_ROLE_KEY env var. Please add it to your .env file for secure backend operations.`;
+    console.error(`[RentWebify Server] ${message}`);
     throw new Error(message);
   }
 

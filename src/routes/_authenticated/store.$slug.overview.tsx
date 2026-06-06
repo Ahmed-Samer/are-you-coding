@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { useStore } from "./store.$slug";
+import { useStore } from "@/lib/store-context";
 import { getTenantStats, listMyOrders } from "@/lib/catalog.functions";
 import { getTenantAnalyticsSeries } from "@/lib/analytics.functions";
 import { formatPrice } from "@/lib/cart";

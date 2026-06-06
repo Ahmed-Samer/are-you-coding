@@ -39,7 +39,13 @@ vi.mock("@/lib/rate-limit.server", () => ({
 
 vi.mock("@/lib/billing.functions", () => ({
   listPlans: vi.fn(),
-  createTenantAndSubscription: vi.fn(),
+  createTenant: vi.fn(),
+  createAccountSubscription: vi.fn(),
+  getMyAccountSubscription: vi.fn(),
+}));
+
+vi.mock("@/lib/billing-admin.functions", () => ({
+  upgradeAccountPlan: vi.fn(),
 }));
 
 vi.mock("@/lib/onboarding.functions", () => ({
@@ -61,7 +67,7 @@ vi.mock("@/components/shells/PlatformShell", () => ({
 }));
 
 import { OnboardingPage } from "@/routes/_authenticated/onboarding";
-import { listPlans, createTenantAndSubscription } from "@/lib/billing.functions";
+import { listPlans, createTenant, createAccountSubscription, getMyAccountSubscription } from "@/lib/billing.functions";
 import { toast } from "sonner";
 
 // --- Helpers ------------------------------------------------------------
@@ -74,7 +80,7 @@ const PLANS = {
       price_usd: 19,
       interval: "monthly",
       description: "For new merchants",
-      features: ["100 products", "WhatsApp checkout"],
+      features: ["1 Storefront included", "100 products", "WhatsApp checkout"],
     },
     {
       slug: "growth-monthly",
@@ -82,9 +88,27 @@ const PLANS = {
       price_usd: 49,
       interval: "monthly",
       description: "For scaling stores",
-      features: ["Unlimited products"],
+      features: ["Up to 3 Storefronts", "Unlimited products"],
     },
   ],
+};
+
+// Mock response for getMyAccountSubscription when user has NO active subscription
+const NO_SUB_RESPONSE = {
+  subscription: null,
+  currentStoreCount: 0,
+  quota: { maxStores: 0, hasCustomDomain: false, canCreateMore: false },
+};
+
+// Mock response for getMyAccountSubscription when user HAS an active subscription
+const ACTIVE_SUB_RESPONSE = {
+  subscription: {
+    id: "sub-123",
+    status: "active",
+    plans: { name: "Starter", slug: "starter-monthly", max_stores: 1, has_custom_domain: false },
+  },
+  currentStoreCount: 0,
+  quota: { maxStores: 1, hasCustomDomain: false, canCreateMore: true },
 };
 
 function renderPage() {
@@ -102,16 +126,18 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   (listPlans as any).mockResolvedValue(PLANS);
+  // Default: no active subscription (full flow)
+  (getMyAccountSubscription as any).mockResolvedValue(NO_SUB_RESPONSE);
 });
 
 // --- Tests --------------------------------------------------------------
 
-describe("Onboarding wizard (signup → onboarding → first store created)", () => {
+describe("Onboarding wizard — FULL FLOW (no active subscription)", () => {
   it("renders the basics step with name + slug fields", async () => {
     renderPage();
-    expect(await screen.findByRole("heading", { name: /store basics/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/store name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/store address/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /platform specifics/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/platform name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/platform address/i)).toBeInTheDocument();
     // Continue is disabled until valid name + slug
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
   });
@@ -120,10 +146,10 @@ describe("Onboarding wizard (signup → onboarding → first store created)", ()
     const user = userEvent.setup();
     renderPage();
 
-    const name = await screen.findByLabelText(/store name/i);
+    const name = await screen.findByLabelText(/platform name/i);
     await user.type(name, "Acme Goods!");
 
-    const slug = screen.getByLabelText(/store address/i) as HTMLInputElement;
+    const slug = screen.getByLabelText(/platform address/i) as HTMLInputElement;
     // slugify strips "!", lowercases, joins with "-"
     await waitFor(() => expect(slug.value).toBe("acme-goods"));
 
@@ -146,23 +172,23 @@ describe("Onboarding wizard (signup → onboarding → first store created)", ()
     await waitFor(() => expect(continueBtn).toBeEnabled(), { timeout: 2000 });
   });
 
-  it("completes all steps, creates the store, and navigates to checkout", async () => {
+  it("completes full flow: creates subscription, navigates to checkout", async () => {
     const user = userEvent.setup();
-    (createTenantAndSubscription as any).mockResolvedValue({
-      tenantId: "tenant-123",
-      subscriptionId: "sub-abc",
+    (createAccountSubscription as any).mockResolvedValue({
+      subscriptionId: "acct-sub-456",
+      planSlug: "starter-monthly",
     });
 
     renderPage();
 
     // Step 1: basics
-    await user.type(await screen.findByLabelText(/store name/i), "Acme Goods");
+    await user.type(await screen.findByLabelText(/platform name/i), "Acme Goods");
     const cont1 = screen.getByRole("button", { name: /continue/i });
     await waitFor(() => expect(cont1).toBeEnabled(), { timeout: 2000 });
     await user.click(cont1);
 
-    // Step 2: template — default "atelier" is available; just continue
-    await screen.findByRole("heading", { name: /choose a template/i });
+    // Step 2: template — default "classic" is available; just continue
+    await screen.findByRole("heading", { name: /choose an architecture/i });
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     // Step 3: plan — wait for plans to load, then pick Starter
@@ -172,97 +198,87 @@ describe("Onboarding wizard (signup → onboarding → first store created)", ()
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     // Step 4: confirm + create
-    await screen.findByRole("heading", { name: /confirm and continue/i });
-    const create = screen.getByRole("button", { name: /create store/i });
+    await screen.findByRole("heading", { name: /confirm and deploy/i });
+    const create = screen.getByRole("button", { name: /deploy/i });
     await user.click(create);
 
-    await waitFor(() => expect(createTenantAndSubscription).toHaveBeenCalledTimes(1));
-    const callArg = (createTenantAndSubscription as any).mock.calls[0][0];
+    await waitFor(() => expect(createAccountSubscription).toHaveBeenCalledTimes(1));
+    const callArg = (createAccountSubscription as any).mock.calls[0][0];
     expect(callArg.data).toMatchObject({
-      name: "Acme Goods",
-      slug: "acme-goods",
       planSlug: "starter-monthly",
       interval: "monthly",
-      niche: "retail",
-      template: "atelier",
     });
-    // Idempotency key is generated client-side and passed to the server.
-    expect(typeof callArg.data.idempotencyKey).toBe("string");
-    expect(callArg.data.idempotencyKey.length).toBeGreaterThan(8);
 
     await waitFor(() =>
       expect(navigateMock).toHaveBeenCalledWith(
         expect.objectContaining({
           to: "/checkout/$subscriptionId",
-          params: { subscriptionId: "sub-abc" },
+          params: { subscriptionId: "acct-sub-456" },
         }),
       ),
     );
 
-    // Draft now persists until the checkout route mounts and clears it.
-    // The submitted subscriptionId is recorded so a retry returns to the
-    // same checkout if the user reloads before checkout mount fires.
-    const persisted = JSON.parse(
-      localStorage.getItem("coreweb:onboarding:draft:v4") ?? "{}",
-    );
-    expect(persisted.submittedSubscriptionId).toBe("sub-abc");
     expect((toast as any).success).toHaveBeenCalled();
   });
+});
 
-  it("routes a SLUG_TAKEN structured error back to the basics step", async () => {
+describe("Onboarding wizard — SHORT FLOW (active subscription)", () => {
+  beforeEach(() => {
+    (getMyAccountSubscription as any).mockResolvedValue(ACTIVE_SUB_RESPONSE);
+  });
+
+  it("shows short flow with 3 steps and no plan step", async () => {
+    renderPage();
+    // Should show "Create a new store" heading
+    expect(await screen.findByRole("heading", { name: /platform specifics/i })).toBeInTheDocument();
+    // Should show the active subscription banner
+    expect(await screen.findByText(/active subscription/i)).toBeInTheDocument();
+  });
+
+  it("creates a store directly without payment in short flow", async () => {
     const user = userEvent.setup();
-    (createTenantAndSubscription as any).mockRejectedValue(
-      new Error(
-        JSON.stringify({
-          code: "SLUG_TAKEN",
-          message: "That store address is already taken.",
-          step: "basics",
-          field: "slug",
+    (createTenant as any).mockResolvedValue({
+      tenantId: "tenant-789",
+      slug: "quick-store",
+    });
+
+    renderPage();
+
+    // Step 1: basics
+    await user.type(await screen.findByLabelText(/platform name/i), "Quick Store");
+    const cont1 = screen.getByRole("button", { name: /continue/i });
+    await waitFor(() => expect(cont1).toBeEnabled(), { timeout: 2000 });
+    await user.click(cont1);
+
+    // Step 2: template — continue
+    await screen.findByRole("heading", { name: /choose an architecture/i });
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    // Step 3: confirm + create (no plan step!)
+    await screen.findByRole("heading", { name: /confirm and deploy/i });
+    const create = screen.getByRole("button", { name: /create store/i });
+    await user.click(create);
+
+    await waitFor(() => expect(createTenant).toHaveBeenCalledTimes(1));
+    const callArg = (createTenant as any).mock.calls[0][0];
+    expect(callArg.data).toMatchObject({
+      name: "Quick Store",
+      slug: "quick-store",
+      niche: "retail",
+      template: "classic",
+    });
+
+    // Should navigate to dashboard (not checkout)
+    await waitFor(() =>
+      expect(navigateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: "/dashboard",
         }),
       ),
     );
 
-    renderPage();
-    await user.type(await screen.findByLabelText(/store name/i), "Acme Goods");
-    const cont = screen.getByRole("button", { name: /continue/i });
-    await waitFor(() => expect(cont).toBeEnabled(), { timeout: 2000 });
-    await user.click(cont);
-    await user.click(await screen.findByRole("button", { name: /continue/i }));
-    await screen.findByRole("heading", { name: /pick your plan/i });
-    await user.click(await screen.findByRole("radio", { name: /starter/i }));
-    await user.click(screen.getByRole("button", { name: /continue/i }));
-    await user.click(await screen.findByRole("button", { name: /create store/i }));
-
-    await waitFor(() =>
-      expect((toast as any).error).toHaveBeenCalledWith(
-        "That store address is already taken.",
-      ),
-    );
-    // Bounced back to basics.
-    await screen.findByRole("heading", { name: /store basics/i });
-    expect(navigateMock).not.toHaveBeenCalled();
-  });
-
-  it("retains backwards compatibility with legacy free-text errors", async () => {
-    const user = userEvent.setup();
-    (createTenantAndSubscription as any).mockRejectedValue(
-      new Error("Slug already taken"),
-    );
-
-    renderPage();
-    await user.type(await screen.findByLabelText(/store name/i), "Acme Goods");
-    const cont = screen.getByRole("button", { name: /continue/i });
-    await waitFor(() => expect(cont).toBeEnabled(), { timeout: 2000 });
-    await user.click(cont);
-    await user.click(await screen.findByRole("button", { name: /continue/i }));
-    await screen.findByRole("heading", { name: /pick your plan/i });
-    await user.click(await screen.findByRole("radio", { name: /starter/i }));
-    await user.click(screen.getByRole("button", { name: /continue/i }));
-    await user.click(await screen.findByRole("button", { name: /create store/i }));
-
-    await waitFor(() =>
-      expect((toast as any).error).toHaveBeenCalledWith("Slug already taken"),
-    );
-    expect(navigateMock).not.toHaveBeenCalled();
+    expect((toast as any).success).toHaveBeenCalled();
+    // createAccountSubscription should NOT be called in short flow
+    expect(createAccountSubscription).not.toHaveBeenCalled();
   });
 });

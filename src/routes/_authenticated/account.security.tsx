@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { ShieldCheck, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/account/security")({
-  head: () => ({ meta: [{ title: "Security — CoreWeb" }] }),
+  head: () => ({ meta: [{ title: "Security — RentWebify" }] }),
   component: SecurityPage,
 });
 

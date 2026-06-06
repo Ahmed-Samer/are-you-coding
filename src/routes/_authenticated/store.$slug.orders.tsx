@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useStore } from "./store.$slug";
+import { useStore } from "@/lib/store-context";
 import { listMyOrders, updateOrderStatus } from "@/lib/catalog.functions";
 import { formatPrice } from "@/lib/cart";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
-import { Search, MessageCircle, Printer } from "lucide-react";
+import { Search, MessageCircle, Printer, PackageX } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/store/$slug/orders")({
   component: OrdersPage,
@@ -31,6 +31,13 @@ function statusVariant(s: string): "default" | "secondary" | "destructive" | "ou
   if (s === "confirmed") return "secondary";
   return "outline";
 }
+
+const ALLOWED_TRANSITIONS: Record<Status, Status[]> = {
+  whatsapp_sent: ["whatsapp_sent", "confirmed", "cancelled"],
+  confirmed: ["confirmed", "fulfilled", "cancelled"],
+  fulfilled: ["fulfilled"], // Terminal state, cannot be changed once fulfilled (to ensure integrity)
+  cancelled: ["cancelled", "whatsapp_sent"], // Can only restart from the beginning if cancelled
+};
 
 const OrderRow = memo(function OrderRow({
   order: o,
@@ -213,7 +220,15 @@ function OrdersPage() {
         {isLoading ? (
           <TableSkeleton rows={5} cols={4} />
         ) : (data?.orders ?? []).length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">No orders yet.</div>
+          <div className="flex flex-col items-center justify-center p-16 text-center">
+            <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4 text-muted-foreground">
+              <PackageX className="size-8" />
+            </div>
+            <h3 className="text-lg font-semibold mb-1">No Orders Yet</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mb-6">
+              When customers place orders on your storefront, they will appear here. Share your store link to get started!
+            </p>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">No orders match your filters.</div>
         ) : (
@@ -248,7 +263,19 @@ function OrdersPage() {
                   <Select value={openOrder.status} onValueChange={(v) => statusMut.mutate({ id: openOrder.id, status: v as Status })}>
                     <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s.replace(/_/g, " ")}</SelectItem>)}
+                      {STATUSES.map((s) => {
+                        const isAllowed = ALLOWED_TRANSITIONS[openOrder.status as Status]?.includes(s);
+                        return (
+                          <SelectItem 
+                            key={s} 
+                            value={s} 
+                            disabled={!isAllowed}
+                            className="capitalize"
+                          >
+                            {s.replace(/_/g, " ")} {!isAllowed && "(Not Allowed)"}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </section>

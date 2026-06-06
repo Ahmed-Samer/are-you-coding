@@ -47,8 +47,8 @@ type FormValues = z.infer<typeof schema>;
 export const Route = createFileRoute("/signup")({
   head: () => ({
     meta: [
-      { title: "Create your account — CoreWeb" },
-      { name: "description", content: "Create your CoreWeb account and launch your online store." },
+      { title: "Create your account — RentWebify" },
+      { name: "description", content: "Create your RentWebify account and launch your online store." },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -66,9 +66,6 @@ export const Route = createFileRoute("/signup")({
   component: SignupPage,
 });
 
-/** Builds the post-confirmation destination, folding `plan` into the final
- *  URL so the auth callback (which only knows about `next`) can land users
- *  on the right place with the plan preserved. */
 function buildConfirmRedirect(
   redirectTo: string | null,
   plan: string | undefined,
@@ -81,6 +78,7 @@ function buildConfirmRedirect(
   return `${window.location.origin}/auth/callback?next=${encodeURIComponent(withPlan)}`;
 }
 
+// Function stays internal to fix code splitting
 function SignupPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: "/signup" });
@@ -123,12 +121,10 @@ function SignupPage() {
   const fullNameReg = register("fullName");
   const passwordReg = register("password");
 
-  // Autofocus first field on mount (form view only).
   useEffect(() => {
     if (!submittedEmail) firstFieldRef.current?.focus();
   }, [submittedEmail]);
 
-  // Lightweight focus trap (Tab cycles within the form container).
   useEffect(() => {
     if (submittedEmail) return;
     const node = formContainerRef.current;
@@ -154,7 +150,6 @@ function SignupPage() {
     return () => node.removeEventListener("keydown", handler);
   }, [submittedEmail]);
 
-  // Resend cooldown ticker.
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const t = setInterval(
@@ -204,10 +199,6 @@ function SignupPage() {
       return;
     }
 
-    // Supabase returns a `user` with empty `identities` when an account
-    // already exists with this email and confirmation is required. Surface a
-    // neutral notice — do not advance to the "check your inbox" view, since
-    // no new email was actually sent.
     const identities = (data.user as { identities?: unknown[] } | null)
       ?.identities;
     if (Array.isArray(identities) && identities.length === 0) {
@@ -260,9 +251,6 @@ function SignupPage() {
     reset({ fullName: getValues("fullName"), email: "", password: "" });
   };
 
-  // ────────────────────────────────────────────────────────────────────────
-  // Persistent "check your inbox" view
-  // ────────────────────────────────────────────────────────────────────────
   if (submittedEmail) {
     return (
       <PlatformShell>
@@ -320,9 +308,6 @@ function SignupPage() {
     );
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // Signup form
-  // ────────────────────────────────────────────────────────────────────────
   const fieldErrorList = Object.entries(errors)
     .map(([k, v]) => v?.message && `${k}: ${v.message}`)
     .filter(Boolean) as string[];
@@ -338,7 +323,6 @@ function SignupPage() {
           Start your free trial. Set up your store in minutes.
         </p>
 
-        {/* Persistent error / notice region — reserved height to avoid CLS. */}
         <div aria-live="polite" role="alert" className="mt-6 min-h-[2.5rem]">
           {formError ? (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -351,7 +335,6 @@ function SignupPage() {
           ) : null}
         </div>
 
-        {/* Duplicate / already-confirmed neutral notice — non-enumerating. */}
         <div className="min-h-[2.5rem]">
           {duplicateNotice && (
             <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -418,7 +401,6 @@ function SignupPage() {
                 passwordInputRef.current = el;
               }}
             />
-            {/* Reserve vertical space for the strength meter to avoid CLS. */}
             <div className="min-h-[2.25rem]">
               <PasswordStrength value={password ?? ""} />
             </div>

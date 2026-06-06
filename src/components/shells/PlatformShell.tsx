@@ -22,7 +22,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
         <div className="mx-auto max-w-7xl px-6 h-14 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
             <span className="inline-block size-6 rounded-md bg-primary" aria-hidden />
-            <span>CoreWeb</span>
+            <span>RentWebify</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <Link to="/templates" className="hover:text-foreground transition-colors" activeProps={{ className: "text-foreground" }}>Templates</Link>
@@ -80,7 +80,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
       <main className="flex-1">{children}</main>
       <footer className="border-t border-border">
         <div className="mx-auto max-w-7xl px-6 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-sm text-muted-foreground">
-          <div>© {new Date().getFullYear()} CoreWeb — Websites for modern retailers.</div>
+          <div>© {new Date().getFullYear()} RentWebify — Websites for modern retailers.</div>
           <div className="flex items-center gap-6">
             <Link to="/about" className="hover:text-foreground transition-colors">About</Link>
             <Link to="/contact" className="hover:text-foreground transition-colors">Contact</Link>

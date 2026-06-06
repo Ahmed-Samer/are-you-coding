@@ -7,7 +7,7 @@ import {
   Check, Copy, Globe, AlertTriangle, Clock, RefreshCw, Plus, Trash2,
   Star, ShieldCheck, ExternalLink, Lock, Sparkles,
 } from "lucide-react";
-import { useStore } from "./store.$slug";
+import { useStore } from "@/lib/store-context";
 import {
   listMyDomains,
   addDomain,

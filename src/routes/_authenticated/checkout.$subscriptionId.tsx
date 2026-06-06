@@ -25,10 +25,8 @@ import { formatMoney } from "@/lib/format-price";
 import { UploadProofStep } from "@/components/checkout/UploadProofStep";
 import { createProofUploadUrl, finalizeProofUpload } from "@/lib/checkout-proof.functions";
 
-const ONBOARDING_DRAFT_KEY = "coreweb:onboarding:draft:v4";
-
 export const Route = createFileRoute("/_authenticated/checkout/$subscriptionId")({
-  head: () => ({ meta: [{ title: "Checkout — CoreWeb" }] }),
+  head: () => ({ meta: [{ title: "Checkout — RentWebify" }] }),
   validateSearch: z.object({ from: z.string().max(32).optional() }),
   component: CheckoutPage,
 });
@@ -79,12 +77,6 @@ function fmtEgp(n: number) {
   return formatMoney(n, "EGP", "en-EG");
 }
 
-/**
- * Inline copy button with self-contained "Copied" feedback. The icon
- * swaps to a check for 1.5s after a successful copy, and the surrounding
- * caller still owns the actual write-to-clipboard logic so it can fall
- * back to the legacy textarea path in insecure contexts.
- */
 function CopyButton({
   value,
   onCopy,
@@ -122,12 +114,6 @@ function CopyButton({
   );
 }
 
-/**
- * Insecure-context fallback: a selectable, readonly text field with a
- * "press to copy" hint. Used in places where `navigator.clipboard` is
- * unavailable (HTTP, in-app webviews, ancient browsers). Selecting the
- * field works in every environment we care about.
- */
 function ManualCopyField({ value, label }: { value: string; label: string }) {
   return (
     <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
@@ -146,11 +132,6 @@ function ManualCopyField({ value, label }: { value: string; label: string }) {
   );
 }
 
-/**
- * Structured Checkout-context error parser. The server encodes
- * `{ code, message }` as JSON in `Error.message` so the UI can branch
- * cleanly between 404 / 403 / transient panels.
- */
 type CheckoutErrorCode = "NOT_FOUND" | "FORBIDDEN" | "TRANSIENT";
 type ParsedCheckoutError = { code: CheckoutErrorCode; message: string };
 
@@ -178,15 +159,6 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // After a successful onboarding handoff, clear the persisted draft. This
-  // is deferred from the onboarding wizard so the draft survives any
-  // navigation hiccup between create-success and checkout-mount.
-  useEffect(() => {
-    if (from === "onboarding") {
-      try { window.localStorage.removeItem(ONBOARDING_DRAFT_KEY); } catch {}
-    }
-  }, [from]);
-
   const fetchCheckout = useServerFn(getCheckoutContext);
   const fetchMethods = useServerFn(listPaymentMethods);
   const fetchFx = useServerFn(getCurrentFxRate);
@@ -200,8 +172,6 @@ export function CheckoutPage() {
   const { data: checkout, isLoading, error: checkoutError, refetch: refetchCheckout } = useQuery({
     queryKey: ["checkout", subscriptionId],
     queryFn: () => fetchCheckout({ data: { subscriptionId } }),
-    // Short-circuit retries for structured 404/403 — those won't resolve on
-    // a retry and only delay the error UI.
     retry: (count, err) => {
       const parsed = parseCheckoutError(err);
       if (parsed.code === "NOT_FOUND" || parsed.code === "FORBIDDEN") return false;
@@ -211,14 +181,15 @@ export function CheckoutPage() {
       const data: any = q.state.data;
       const status = data?.subscription?.status;
       const hasPending = (data?.subscription?.payment_proofs ?? []).some((p: any) => p.status === "pending");
-      // Poll while we're waiting on review or activation
       return status === "active" ? false : hasPending ? 15_000 : false;
     },
   });
+
   const { data: methodsData } = useQuery({
     queryKey: ["payment-methods"],
     queryFn: () => fetchMethods(),
   });
+
   const { data: fxData, error: fxError, isLoading: fxLoadingQuery } = useQuery({
     queryKey: ["fx-usd-egp"],
     queryFn: () => fetchFx(),
@@ -238,14 +209,13 @@ export function CheckoutPage() {
   const latestProof = proofs[0];
   const latestProofStatus: string | null = latestProof?.status ?? null;
   const isActive = sub?.status === "active";
+  const isCancelled = sub?.status === "cancelled";
+  const isExpired = sub?.status === "expired";
 
-  // Land the user on the right step:
-  //   active            → pending (success screen)
-  //   pending proof     → pending (waiting review)
-  //   latest rejected   → proof   (let them resubmit, with an inline alert)
-  //   otherwise         → review
   const initialStep: StepId = isActive
     ? "pending"
+    : isCancelled
+    ? "review"
     : hasPendingProof
     ? "pending"
     : latestProofStatus === "rejected"
@@ -268,52 +238,54 @@ export function CheckoutPage() {
   const autoRoutedRef = useRef(false);
   const [resendingEmail, setResendingEmail] = useState(false);
   const [cooldownSec, setCooldownSec] = useState(0);
-  // Detect clipboard availability once; the legacy textarea fallback always
-  // works but we want to surface the "press to copy" hint up-front when the
-  // browser can't grant async clipboard access (insecure context, in-app
-  // webview, older Safari, etc.).
+
   const clipboardSupported = useMemo(() => {
     if (typeof navigator === "undefined") return true;
     return !!(navigator.clipboard && typeof window !== "undefined" && window.isSecureContext);
   }, []);
 
-  // In-app notification: detect when sub becomes active or proof gets rejected.
   useEffect(() => {
     if (!sub) return;
     const proofs = sub.payment_proofs ?? [];
     const latestProof = proofs[0];
     if (lastStatusRef.current && lastStatusRef.current !== sub.status && sub.status === "active") {
-      toast.success("Your subscription is now active!", { description: "Your store is live." });
+      toast.success("Your subscription is active", {
+        description: "You can now deploy stores from your dashboard.",
+      });
     }
     if (
       lastProofStatusRef.current === "pending" &&
       latestProof?.status === "rejected"
     ) {
       toast.error("Your payment proof was rejected", { description: "Please review your details and resubmit." });
-      // Auto-advance the stepper back to the proof step so the user is not
-      // stranded on the pending screen after a rejection.
       setStep("proof");
     }
     lastStatusRef.current = sub.status;
     lastProofStatusRef.current = latestProof?.status ?? null;
   }, [sub]);
 
-  // State-machine auto-route based on the server's subscription status.
-  // Fires once per mount; the cancelled / active branches navigate away
-  // from this route entirely.
   useEffect(() => {
     if (!sub || autoRoutedRef.current) return;
     const status = sub.status;
-    const slug = sub.tenants?.slug as string | undefined;
     if (status === "cancelled") {
       autoRoutedRef.current = true;
       toast.message("This checkout was cancelled.");
       void navigate({ to: "/dashboard" });
       return;
     }
-    if (status === "active" && slug) {
+    if (status === "expired") {
       autoRoutedRef.current = true;
-      void navigate({ to: "/store/$slug/overview", params: { slug } });
+      toast.message("This checkout expired. Start a new one from the dashboard.");
+      void navigate({ to: "/dashboard" });
+      return;
+    }
+    if (status === "active") {
+      // In the new flow, account subscriptions are activated by admin
+      // approval of a payment proof. After activation the user goes to the
+      // dashboard to deploy their first store — there is no pre-existing
+      // tenant to "open" anymore.
+      autoRoutedRef.current = true;
+      void navigate({ to: "/dashboard" });
       return;
     }
     if (status === "pending_review") {
@@ -321,18 +293,13 @@ export function CheckoutPage() {
       setStep("pending");
       return;
     }
-    // pending_payment → stay on the wizard (review/instructions/proof).
     autoRoutedRef.current = true;
   }, [sub, navigate]);
 
-  // FX rate is server-authoritative. No silent fallback — if it failed to
-  // load, the checkout cannot quote an EGP total, and the "Continue" button
-  // is disabled until the query resolves.
   const fxRate: number | null = fxData?.rate ?? null;
   const fxLoading = fxLoadingQuery && !fxError;
   const fxUnavailable = !!fxError;
-  // Live price is the source of truth for what the user will pay; the
-  // snapshot from onboarding is shown only when it drifted.
+
   const livePriceUsd: number | null =
     (checkout as any)?.livePriceUsd ?? (sub?.plans?.price_usd ? Number(sub.plans.price_usd) : null);
   const snapshotPriceUsd: number | null = (checkout as any)?.priceSnapshotUsd ?? livePriceUsd;
@@ -352,9 +319,6 @@ export function CheckoutPage() {
   const instructionsEmailLastSentAt: string | null =
     (checkout as any)?.instructionsEmailLastSentAt ?? null;
 
-  // Tick down the resend cooldown each second. Restarts whenever the
-  // server-returned `instructionsEmailLastSentAt` advances (e.g. after a
-  // successful resend triggers a refetch).
   useEffect(() => {
     if (!instructionsEmailLastSentAt) {
       setCooldownSec(0);
@@ -376,10 +340,6 @@ export function CheckoutPage() {
     return () => window.clearInterval(id);
   }, [instructionsEmailLastSentAt]);
 
-  // Re-validate the subscription on window focus so a user with two tabs
-  // open (paid in one, kept this one open) doesn't see a stale "still
-  // pending" screen — the next focus reads fresh status and the state
-  // machine above auto-routes off the wizard.
   useEffect(() => {
     const onFocus = () => { void refetchCheckout(); };
     window.addEventListener("focus", onFocus);
@@ -438,20 +398,6 @@ export function CheckoutPage() {
 
   const goTo = (next: StepId) => setStep(next);
 
-  // Trigger the confirmation dialog instead of submitting directly.
-  const onRequestSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!methodId) {
-      toast.error("Pick a payment method");
-      return;
-    }
-    if (!reference.trim()) {
-      toast.error("Enter your transaction reference");
-      return;
-    }
-    setConfirmSubmit(true);
-  };
-
   const onSubmitProof = async () => {
     if (!methodId) {
       toast.error("Pick a payment method");
@@ -474,9 +420,6 @@ export function CheckoutPage() {
         screenshotPath = path;
         setUploading(false);
       }
-      // Server recomputes amountUsd / amountEgp / fxRate from the plan and
-      // live FX table. The client must NOT send those — anything we'd put
-      // here would be ignored anyway, and including them invites confusion.
       await submit({
         data: {
           subscriptionId,
@@ -491,6 +434,7 @@ export function CheckoutPage() {
         queryClient.invalidateQueries({ queryKey: ["checkout", subscriptionId] }),
         queryClient.invalidateQueries({ queryKey: ["my-tenants"] }),
         queryClient.invalidateQueries({ queryKey: ["my-tenants-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-account-subscription"] }),
       ]);
       setFile(null);
       setReference("");
@@ -505,13 +449,6 @@ export function CheckoutPage() {
     }
   };
 
-  /**
-   * Resilient copy-to-clipboard. Falls back to a hidden textarea +
-   * `document.execCommand("copy")` in insecure contexts (HTTP, older
-   * browsers, in-app webviews) where `navigator.clipboard` is unavailable.
-   * Returns true when the value made it into the clipboard, so callers can
-   * decide whether to surface the manual-copy hint instead.
-   */
   const copy = async (text: string): Promise<boolean> => {
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard && window.isSecureContext) {
@@ -520,7 +457,7 @@ export function CheckoutPage() {
         return true;
       }
     } catch {
-      // fall through to legacy path
+      // fall through
     }
     try {
       const ta = document.createElement("textarea");
@@ -543,8 +480,6 @@ export function CheckoutPage() {
     return false;
   };
 
-
-
   const onEditProof = () => {
     void (async () => {
       try {
@@ -553,6 +488,7 @@ export function CheckoutPage() {
           queryClient.invalidateQueries({ queryKey: ["checkout", subscriptionId] }),
           queryClient.invalidateQueries({ queryKey: ["my-tenants"] }),
           queryClient.invalidateQueries({ queryKey: ["my-tenants-stats"] }),
+          queryClient.invalidateQueries({ queryKey: ["my-account-subscription"] }),
         ]);
         setStep("instructions");
         toast.message("Previous proof cleared — submit your new details.");
@@ -567,7 +503,10 @@ export function CheckoutPage() {
     try {
       await cancelSub({ data: { subscriptionId } });
       toast.success("Checkout cancelled.");
-      await queryClient.invalidateQueries({ queryKey: ["my-tenants"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["my-tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-account-subscription"] }),
+      ]);
       navigate({ to: "/dashboard" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not cancel");
@@ -609,7 +548,7 @@ export function CheckoutPage() {
         toast.info(message);
       } else if (code === "WRONG_STATUS") {
         toast.message(message);
-        await refetchCheckout(); // auto-route to the right step
+        await refetchCheckout();
       } else if (code === "EMAIL_NOT_CONFIGURED" || code === "NO_RECIPIENT") {
         toast.error(message);
       } else {
@@ -619,6 +558,39 @@ export function CheckoutPage() {
       setResendingEmail(false);
     }
   };
+
+  // Cancelled / expired subscription state — show a clear message and route
+  // the user back to the dashboard so they can start a fresh checkout.
+  if (isCancelled || isExpired) {
+    return (
+      <PlatformShell>
+        <div className="mx-auto max-w-3xl px-6 py-12">
+          <div
+            role="alert"
+            className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-6 text-sm"
+          >
+            <h2 className="text-base font-semibold flex items-center gap-2">
+              <AlertTriangle className="size-4 text-amber-600" />
+              {isCancelled ? "This checkout was cancelled" : "This checkout has expired"}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {isCancelled
+                ? "You cancelled this checkout before submitting payment proof. Start a new subscription from the dashboard to continue."
+                : "This subscription is no longer active. Start a new subscription from the dashboard to continue."}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button onClick={() => navigate({ to: "/onboarding" })}>
+                Start a new subscription
+              </Button>
+              <Button variant="ghost" onClick={() => navigate({ to: "/dashboard" })}>
+                Back to dashboard
+              </Button>
+            </div>
+          </div>
+        </div>
+      </PlatformShell>
+    );
+  }
 
   return (
     <PlatformShell>
@@ -680,12 +652,13 @@ export function CheckoutPage() {
               <div className="space-y-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-semibold">Review your order</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">Confirm what you're subscribing to.</p>
+                    <h2 className="text-lg font-semibold">Review your subscription</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Confirm the plan you'd like to activate on your account.
+                    </p>
                   </div>
                   <Link
                     to="/onboarding"
-                    
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                   >
                     <ArrowLeft className="size-3" />
@@ -724,8 +697,7 @@ export function CheckoutPage() {
                     <div>
                       <div className="font-medium">{sub.plans?.name ?? "Plan unavailable"}</div>
                       <div className="text-xs text-muted-foreground">
-                        {sub.tenants?.name}
-                        {sub.plans?.interval ? ` · billed ${sub.plans.interval}` : ""}
+                        {sub.plans?.interval ? `Billed ${sub.plans.interval}` : ""}
                       </div>
                     </div>
                     <div className="text-right">
@@ -736,7 +708,7 @@ export function CheckoutPage() {
                 </div>
 
                 {planRemoved ? (
-                  <Link to="/onboarding"  className="block">
+                  <Link to="/onboarding" className="block">
                     <Button className="w-full" variant="default">
                       Choose a different plan
                     </Button>
@@ -762,9 +734,6 @@ export function CheckoutPage() {
                   </p>
                 </div>
 
-                {/* Reference + amount header — single source of truth for what
-                    the user owes and how to identify the payment. Min-height
-                    reserves layout to prevent CLS while bank config loads. */}
                 <div
                   className="rounded-lg border border-border bg-accent/40 p-4 min-h-[140px]"
                   aria-label="Payment summary"
@@ -817,7 +786,6 @@ export function CheckoutPage() {
                   )}
                 </div>
 
-                {/* Resend instructions to email */}
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs">
                   <span className="text-muted-foreground">
                     Switching devices? Email these instructions to yourself.
@@ -846,7 +814,7 @@ export function CheckoutPage() {
                     >
                       <p className="font-medium text-destructive">No payment methods are currently configured</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Please contact support so we can complete your subscription.
+                        Please contact support on <strong>01226399207</strong> so we can complete your subscription.
                       </p>
                     </div>
                   ) : (
@@ -944,6 +912,7 @@ export function CheckoutPage() {
                     queryClient.invalidateQueries({ queryKey: ["checkout", subscriptionId] }),
                     queryClient.invalidateQueries({ queryKey: ["my-tenants"] }),
                     queryClient.invalidateQueries({ queryKey: ["my-tenants-stats"] }),
+                    queryClient.invalidateQueries({ queryKey: ["my-account-subscription"] }),
                   ]);
                 }}
                 onSuccess={() => {
@@ -967,7 +936,7 @@ export function CheckoutPage() {
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {isActive
-                      ? "Your store is live. Manage it from your dashboard."
+                      ? "You're all set. Head to your dashboard to deploy your first store."
                       : "Our team will verify your transaction within 24 hours. You'll get an email when it's approved."}
                   </p>
                   {pendingProof && !isActive && (
@@ -984,6 +953,11 @@ export function CheckoutPage() {
                   <Link to="/dashboard">
                     <Button variant={isActive ? "default" : "ghost"}>Go to dashboard</Button>
                   </Link>
+                  {isActive && (
+                    <Link to="/new-store">
+                      <Button>Deploy your first store</Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             )}
@@ -992,10 +966,6 @@ export function CheckoutPage() {
           <aside className="rounded-lg border border-border bg-card p-5 text-sm">
             <h3 className="font-semibold">Summary</h3>
             <dl className="mt-4 space-y-2">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Store</dt>
-                <dd className="font-medium">{sub.tenants?.name}</dd>
-              </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Plan</dt>
                 <dd className="font-medium">{sub.plans?.name}</dd>

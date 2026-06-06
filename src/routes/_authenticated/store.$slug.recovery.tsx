@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
-import { useStore } from "./store.$slug";
+import { useStore } from "@/lib/store-context";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const RecoveryStatsCards = lazy(() =>

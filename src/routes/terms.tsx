@@ -4,16 +4,16 @@ import { PlatformShell } from "@/components/shells/PlatformShell";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms of Service — CoreWeb" },
+      { title: "Terms of Service — RentWebify" },
       {
         name: "description",
         content:
-          "Terms governing your use of the CoreWeb hosted storefront platform — accounts, billing, acceptable use, and liability.",
+          "Terms governing your use of the RentWebify hosted storefront platform — accounts, billing, acceptable use, and liability.",
       },
-      { property: "og:title", content: "Terms of Service — CoreWeb" },
+      { property: "og:title", content: "Terms of Service — RentWebify" },
       {
         property: "og:description",
-        content: "Terms governing your use of the CoreWeb platform.",
+        content: "Terms governing your use of the RentWebify platform.",
       },
     ],
     links: [{ rel: "canonical", href: "/terms" }],
@@ -39,7 +39,7 @@ function TermsPage() {
           <div>
             <h2 className="text-xl font-semibold">1. Acceptance</h2>
             <p className="mt-2 text-muted-foreground">
-              By creating an account or using CoreWeb you agree to these
+              By creating an account or using RentWebify you agree to these
               terms. If you do not agree, do not use the service.
             </p>
           </div>
@@ -53,7 +53,7 @@ function TermsPage() {
           <div>
             <h2 className="text-xl font-semibold">3. Acceptable use</h2>
             <p className="mt-2 text-muted-foreground">
-              You may not use CoreWeb to sell illegal goods, infringe
+              You may not use RentWebify to sell illegal goods, infringe
               intellectual property, or send unsolicited messages. We may
               suspend stores that violate these rules.
             </p>

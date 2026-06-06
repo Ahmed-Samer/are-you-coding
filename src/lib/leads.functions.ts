@@ -42,7 +42,8 @@ function sanitizeOptional(value: string | null | undefined): string | null {
 async function sendPlaybookEmail(email: string): Promise<void> {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return;
-  const from = process.env.EMAIL_FROM ?? "CoreWeb <onboarding@resend.dev>";
+  // تم تغيير البراند هنا لـ RentWebify
+  const from = process.env.EMAIL_FROM ?? "RentWebify <onboarding@resend.dev>";
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -53,13 +54,13 @@ async function sendPlaybookEmail(email: string): Promise<void> {
       body: JSON.stringify({
         from,
         to: email,
-        subject: "Your retail launch playbook",
+        subject: "Your RentWebify launch playbook",
         html: `
           <p>Hi,</p>
-          <p>Thanks for requesting the <strong>Retail Launch Playbook</strong>.</p>
-          <p>Here's a short guide to launching a profitable WhatsApp-first storefront:
-          <a href="https://coreweb.app/playbook.pdf">Download the PDF</a>.</p>
-          <p>— The CoreWeb team</p>
+          <p>Thanks for requesting the <strong>RentWebify Launch Playbook</strong>.</p>
+          <p>Here's a short guide to launching a profitable Website-as-a-Service storefront:
+          <a href="https://rentwebify.com/playbook.pdf">Download the PDF</a>.</p>
+          <p>— The RentWebify team</p>
         `,
       }),
     });

@@ -80,6 +80,6 @@ describe("AboutPage", () => {
     expect(ld).toBeTruthy();
     const parsed = JSON.parse(ld!.children);
     expect(parsed["@type"]).toBe("Organization");
-    expect(parsed.name).toBe("CoreWeb");
+    expect(parsed.name).toBe("RentWebify");
   });
 });

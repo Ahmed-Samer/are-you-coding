@@ -16,22 +16,22 @@ import { CONTACT_INFO } from "@/lib/contact-info";
 const CONTACT_JSON_LD = {
   "@context": "https://schema.org",
   "@type": "ContactPage",
-  name: "Contact CoreWeb",
+  name: "Contact RentWebify",
   url: "/contact",
   description:
-    "Talk to the CoreWeb team — email, WhatsApp, or the contact form. We reply within one business day.",
+    "Talk to the RentWebify team — email, WhatsApp, or the contact form. We reply within one business day.",
 };
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
-      { title: "Contact — CoreWeb" },
+      { title: "Contact — RentWebify" },
       {
         name: "description",
         content:
-          "Talk to the CoreWeb team. Reach us by email, WhatsApp, or the contact form — we reply within one business day.",
+          "Talk to the RentWebify team. Reach us by email, WhatsApp, or the contact form — we reply within one business day.",
       },
-      { property: "og:title", content: "Contact — CoreWeb" },
+      { property: "og:title", content: "Contact — RentWebify" },
       {
         property: "og:description",
         content: "Get in touch by email, WhatsApp, or the contact form.",

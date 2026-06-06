@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
+import { z } from "zod";
+import { getRootDomain } from "@/lib/branding";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { cacheKey, getOrSet, TTL } from "@/lib/storefront-cache.server";
@@ -37,6 +39,7 @@ export type ResolvedTenant = {
   name: string;
   niche: "retail" | "clinic" | "pharmacy";
   status: "pending" | "active" | "suspended";
+  template: string;
   theme: { [k: string]: JsonValue };
   seo_title: string | null;
   seo_description: string | null;
@@ -74,9 +77,6 @@ function isPlatformPreviewHost(host: string): boolean {
   return /\.lovable\.(app|dev|project\.com)$/i.test(host);
 }
 
-function getRootDomain(): string | null {
-  return process.env.PLATFORM_ROOT_DOMAIN ?? null;
-}
 
 function extractSubdomainSlug(host: string): string | null {
   const root = getRootDomain();
@@ -91,7 +91,7 @@ function extractSubdomainSlug(host: string): string | null {
 }
 
 const TENANT_PUBLIC_COLUMNS =
-  "id,slug,name,niche,status,theme,seo_title,seo_description,og_image_url,logo_url,accent_color,whatsapp_e164";
+  "id,slug,name,niche,status,template,theme,seo_title,seo_description,og_image_url,logo_url,accent_color,whatsapp_e164";
 
 async function lookupBySlug(slug: string): Promise<ResolvedTenant | null> {
   const { value } = await getOrSet(cacheKey.tenantBySlug(slug), TTL.tenantBySlug, async () => {

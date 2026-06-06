@@ -16,7 +16,7 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute("/invite/accept")({
-  head: () => ({ meta: [{ title: "Accept invitation — CoreWeb" }] }),
+  head: () => ({ meta: [{ title: "Accept invitation — RentWebify" }] }),
   validateSearch: searchSchema,
   component: AcceptInvitePage,
 });

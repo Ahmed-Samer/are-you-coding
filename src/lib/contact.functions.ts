@@ -46,7 +46,7 @@ function hashIp(ip: string): string {
   const salt =
     process.env.LEAD_IP_SALT ??
     process.env.SUPABASE_PROJECT_ID ??
-    "lovable-contact-salt";
+    "rentwebify-contact-salt";
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex");
 }
 
@@ -77,8 +77,9 @@ async function sendContactNotification(
 ): Promise<void> {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return;
-  const from = process.env.EMAIL_FROM ?? "CoreWeb <onboarding@resend.dev>";
-  const to = process.env.CONTACT_INBOX ?? "hello@coreweb.app";
+  // تم تغيير البراند هنا
+  const from = process.env.EMAIL_FROM ?? "RentWebify <hello@rentwebify.com>";
+  const to = process.env.CONTACT_INBOX ?? "support@rentwebify.com";
 
   const safeName = escapeHtml(payload.name);
   const safeEmail = escapeHtml(payload.email);
@@ -96,16 +97,20 @@ async function sendContactNotification(
         from,
         to: [to],
         reply_to: payload.email,
-        subject: `New contact message from ${payload.name}`,
+        subject: `[RentWebify Lead] New contact message from ${payload.name}`,
         html: `
-          <h2 style="font-family:Arial,sans-serif;font-size:18px;margin:0 0 12px;">New contact form submission</h2>
-          <table style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;border-collapse:collapse;">
-            <tr><td style="padding:4px 12px 4px 0;color:#666;">Name</td><td>${safeName}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#666;">Email</td><td>${safeEmail}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#666;">Company</td><td>${safeCompany}</td></tr>
-          </table>
-          <h3 style="font-family:Arial,sans-serif;font-size:14px;margin:20px 0 8px;">Message</h3>
-          <div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;white-space:pre-wrap;">${safeMessage}</div>
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #eee;border-radius:8px;padding:20px;">
+            <h2 style="font-size:20px;color:#333;margin:0 0 16px;border-bottom:2px solid #eee;padding-bottom:12px;">New Contact Form Submission</h2>
+            <table style="width:100%;font-size:15px;line-height:1.6;border-collapse:collapse;">
+              <tr><td style="padding:8px 12px 8px 0;color:#666;width:100px;font-weight:bold;">Name</td><td style="color:#111;">${safeName}</td></tr>
+              <tr><td style="padding:8px 12px 8px 0;color:#666;font-weight:bold;">Email</td><td style="color:#111;"><a href="mailto:${safeEmail}" style="color:#0066cc;">${safeEmail}</a></td></tr>
+              <tr><td style="padding:8px 12px 8px 0;color:#666;font-weight:bold;">Company</td><td style="color:#111;">${safeCompany}</td></tr>
+            </table>
+            <div style="margin-top:24px;background:#f9f9f9;padding:16px;border-radius:6px;">
+              <h3 style="font-size:14px;color:#666;margin:0 0 8px;text-transform:uppercase;letter-spacing:1px;">Message</h3>
+              <div style="font-size:15px;line-height:1.6;color:#333;white-space:pre-wrap;">${safeMessage}</div>
+            </div>
+          </div>
         `,
       }),
     });

@@ -34,11 +34,12 @@ export const STATIC_PLANS: StaticPlan[] = [
     currency: "USD",
     interval: "monthly",
     features: [
+      "1 Storefront included",
       "Up to 50 products",
-      "Free subdomain",
-      "WhatsApp ordering",
-      "Local payment methods",
-      "Email support",
+      "Free RentWebify subdomain",
+      "WhatsApp checkout flow",
+      "Local EGP payment methods",
+      "Standard email support",
     ],
     highlight: false,
     sort_order: 10,
@@ -46,14 +47,15 @@ export const STATIC_PLANS: StaticPlan[] = [
   {
     slug: "growth-monthly",
     name: "Growth",
-    description: "For shops with a growing catalog and steady traffic.",
+    description: "For scaling brands with growing catalogs and steady ad traffic.",
     price_usd: 39,
     currency: "USD",
     interval: "monthly",
     features: [
+      "Up to 3 Storefronts",
       "Unlimited products",
-      "Custom domain",
-      "Analytics dashboard",
+      "Custom domain (yourname.com)",
+      "Sales analytics engine",
       "Abandoned-cart recovery",
       "Priority email support",
     ],
@@ -68,10 +70,12 @@ export const STATIC_PLANS: StaticPlan[] = [
     currency: "USD",
     interval: "monthly",
     features: [
+      "Up to 10 Storefronts",
       "Everything in Growth",
+      "Free Custom Domain per store",
       "Up to 10 team seats",
-      "Promo codes & campaigns",
-      "Advanced reporting",
+      "Promo codes & marketing tools",
+      "Advanced export reporting",
       "Priority WhatsApp support",
     ],
     highlight: false,
@@ -85,11 +89,12 @@ export const STATIC_PLANS: StaticPlan[] = [
     currency: "USD",
     interval: "quarterly",
     features: [
+      "1 Storefront included",
       "Up to 50 products",
-      "Free subdomain",
-      "WhatsApp ordering",
-      "Local payment methods",
-      "Email support",
+      "Free RentWebify subdomain",
+      "WhatsApp checkout flow",
+      "Local EGP payment methods",
+      "Standard email support",
     ],
     highlight: false,
     sort_order: 11,
@@ -97,14 +102,15 @@ export const STATIC_PLANS: StaticPlan[] = [
   {
     slug: "growth-quarterly",
     name: "Growth",
-    description: "For shops with a growing catalog and steady traffic.",
+    description: "For scaling brands with growing catalogs and steady ad traffic.",
     price_usd: 105,
     currency: "USD",
     interval: "quarterly",
     features: [
+      "Up to 3 Storefronts",
       "Unlimited products",
-      "Custom domain",
-      "Analytics dashboard",
+      "Custom domain (yourname.com)",
+      "Sales analytics engine",
       "Abandoned-cart recovery",
       "Priority email support",
     ],
@@ -119,10 +125,12 @@ export const STATIC_PLANS: StaticPlan[] = [
     currency: "USD",
     interval: "quarterly",
     features: [
+      "Up to 10 Storefronts",
       "Everything in Growth",
+      "Free Custom Domain per store",
       "Up to 10 team seats",
-      "Promo codes & campaigns",
-      "Advanced reporting",
+      "Promo codes & marketing tools",
+      "Advanced export reporting",
       "Priority WhatsApp support",
     ],
     highlight: false,
@@ -151,36 +159,40 @@ export type ComparisonRow = {
 
 export const COMPARISON_MATRIX: ComparisonRow[] = [
   {
-    label: "Products",
+    label: "Storefronts",
+    values: { Starter: "1 Store", Growth: "Up to 3", Scale: "Up to 10" },
+  },
+  {
+    label: "Products Catalog",
     values: { Starter: "Up to 50", Growth: "Unlimited", Scale: "Unlimited" },
   },
   {
-    label: "Custom domain",
-    values: { Starter: "—", Growth: "Included", Scale: "Included" },
+    label: "Custom Domain",
+    values: { Starter: "—", Growth: "Included", Scale: "Free per store" },
   },
   {
-    label: "Analytics dashboard",
-    values: { Starter: "Basic", Growth: "Full", Scale: "Advanced" },
+    label: "Analytics Dashboard",
+    values: { Starter: "Basic", Growth: "Full Reporting", Scale: "Advanced Insights" },
   },
   {
-    label: "Abandoned-cart recovery",
-    values: { Starter: "—", Growth: "Included", Scale: "Included" },
+    label: "Abandoned-Cart Recovery",
+    values: { Starter: "—", Growth: "Automated", Scale: "Automated" },
   },
   {
-    label: "Promo codes & campaigns",
+    label: "Promo Codes System",
     values: { Starter: "—", Growth: "—", Scale: "Included" },
   },
   {
-    label: "Team seats",
-    values: { Starter: "1", Growth: "3", Scale: "10" },
+    label: "Team Seats (Admins)",
+    values: { Starter: "1 Seat", Growth: "3 Seats", Scale: "10 Seats" },
   },
   {
-    label: "WhatsApp ordering",
+    label: "WhatsApp Integration",
     values: { Starter: "Included", Growth: "Included", Scale: "Included" },
   },
   {
-    label: "Support",
-    values: { Starter: "Email", Growth: "Priority email", Scale: "Priority WhatsApp" },
+    label: "Dedicated Support",
+    values: { Starter: "Email", Growth: "Priority Email", Scale: "Priority WhatsApp" },
   },
 ];
 
@@ -190,33 +202,28 @@ export type FaqEntry = { question: string; answer: string };
 
 export const PRICING_FAQ: FaqEntry[] = [
   {
-    question: "How do I pay?",
+    question: "How do I pay in Egypt?",
     answer:
-      "We accept InstaPay, Vodafone Cash, and direct bank transfer. After choosing a plan you'll see step-by-step instructions and upload a payment proof — your store activates as soon as it's verified.",
+      "We accept all local payment methods: InstaPay, Vodafone Cash, and direct bank transfers. Simply select your preferred method at checkout, upload the payment screenshot, and your store will be activated instantly upon verification.",
   },
   {
     question: "Am I charged in USD or EGP?",
     answer:
-      "Plans are priced in USD for clarity, and you pay the equivalent in EGP using the live exchange rate at checkout. The exact EGP amount is shown before you confirm.",
+      "Our infrastructure costs are tied to USD for stability, but you pay the exact equivalent in EGP using the live market exchange rate at the time of checkout. No hidden currency fees.",
   },
   {
-    question: "Can I switch plans later?",
+    question: "Can I upgrade my plan later if my traffic spikes?",
     answer:
-      "Yes. You can upgrade or downgrade between Starter, Growth, and Scale, or switch between monthly and quarterly billing from your dashboard. Changes apply at the start of your next billing cycle.",
+      "Absolutely. RentWebify is built for scale. You can upgrade to the Growth or Scale plan at any time from your dashboard, and the changes apply immediately without any downtime to your store.",
   },
   {
-    question: "Do you offer refunds?",
+    question: "What counts as a single product?",
     answer:
-      "If something isn't right within the first 14 days of a new subscription, contact us and we'll refund the most recent payment in full. After that, you can cancel at any time and won't be charged again.",
+      "One product equals one main listing in your catalog. Variants (like different colors or sizes of the same T-shirt) do not count as separate products. Starter plans cap at 50 main listings; Growth and Scale are completely unlimited.",
   },
   {
-    question: "What counts as a product?",
+    question: "Are there any hidden setup fees or commissions?",
     answer:
-      "One product = one item listing in your catalog. Variants (size, color, etc.) of the same listing do not count separately. The Starter cap is 50 listings; Growth and Scale are unlimited.",
-  },
-  {
-    question: "Is there a setup fee?",
-    answer:
-      "No. There are no setup fees, contracts, or hidden charges — you pay only for your monthly or quarterly subscription.",
+      "Zero. No setup fees, no hidden contracts, and most importantly, we take 0% commission on your sales. You keep 100% of your profits; you only pay the flat subscription rate.",
   },
 ];

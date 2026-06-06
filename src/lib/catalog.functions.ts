@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { assertSameOrigin, enforceRateLimit } from "@/lib/rate-limit.server";
+import { assertSameOrigin, enforceRateLimit, getClientIp } from "@/lib/rate-limit.server";
 import { isStoreOpen } from "@/lib/availability";
 import { withTiming } from "@/lib/perf.server";
 import { enqueueWebhookEvent } from "@/lib/webhooks.server";
@@ -38,7 +38,7 @@ export const getMyTenantBySlug = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { data: t, error } = await sb
       .from("tenants")
-      .select("id, slug, name, niche, status, owner_id, whatsapp_e164, logo_url, accent_color, seo_title, seo_description, og_image_url, currency, low_stock_threshold, business_hours, is_accepting_orders, timezone, cart_recovery_enabled, cart_recovery_delay_minutes, cart_recovery_message_template")
+      .select("id, slug, name, niche, status, owner_id, whatsapp_e164, logo_url, accent_color, seo_title, seo_description, og_image_url, currency, low_stock_threshold, business_hours, is_accepting_orders, timezone, cart_recovery_enabled, cart_recovery_delay_minutes, cart_recovery_message_template, meta_token, meta_phone_id, meta_template_name")
       .eq("slug", data.slug)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -397,6 +397,16 @@ export const updateTenantSettings = createServerFn({ method: "POST" })
         .nullable(),
       isAcceptingOrders: z.boolean().optional(),
       timezone: z.string().trim().min(1).max(64).optional(),
+      metaToken: z.string().trim().max(500).optional().nullable(),
+      metaPhoneId: z.string().trim().max(100).optional().nullable(),
+      metaTemplateName: z.string().trim().max(100).optional().nullable(),
+      shippingZones: z.record(z.string(), z.object({
+        active: z.boolean(),
+        states: z.record(z.string(), z.object({
+          active: z.boolean(),
+          feeCents: z.number().int().min(0)
+        }))
+      })).optional().nullable(),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
@@ -413,6 +423,10 @@ export const updateTenantSettings = createServerFn({ method: "POST" })
     if (data.businessHours !== undefined) patch.business_hours = data.businessHours ?? null;
     if (data.isAcceptingOrders !== undefined) patch.is_accepting_orders = data.isAcceptingOrders;
     if (data.timezone !== undefined) patch.timezone = data.timezone;
+    if (data.metaToken !== undefined) patch.meta_token = data.metaToken ?? null;
+    if (data.metaPhoneId !== undefined) patch.meta_phone_id = data.metaPhoneId ?? null;
+    if (data.metaTemplateName !== undefined) patch.meta_template_name = data.metaTemplateName ?? null;
+    if (data.shippingZones !== undefined) patch.shipping_zones = data.shippingZones ?? null;
     if (Object.keys(patch).length === 0) return { ok: true };
     const { error } = await sb.from("tenants").update(patch).eq("id", data.tenantId);
     if (error) throw new Error(error.message);
@@ -472,22 +486,38 @@ export const createOrder = createServerFn({ method: "POST" })
       promoCode: z.string().trim().min(1).max(60).optional().nullable(),
       sessionId: z.string().min(8).max(120).optional().nullable(),
       recoveryToken: z.string().min(20).max(120).optional().nullable(),
+      deliveryAreaLabel: z.string().max(200).optional().nullable(),
+      deliveryFeeCents: z.number().int().min(0).optional().nullable(),
     }).parse(i),
   )
 
   .handler(withTiming("createOrder", async ({ data }) => {
     assertSameOrigin();
-    // Cap order spam per tenant: 30 orders / hour from the public storefront.
+    const ip = getClientIp();
+
+    // Cap order spam per IP: 15 orders / hour globally.
     await enforceRateLimit({
-      table: "orders",
-      filters: { tenant_id: data.tenantId },
-      max: 30,
+      table: "auth_throttle_events",
+      filters: { kind: "checkout_ip", key: ip },
+      max: 15,
       windowSec: 60 * 60,
-      label: "orders",
+      label: "orders from your network",
     });
 
+    // Cap order spam per phone: 3 orders / hour per store.
+    await enforceRateLimit({
+      table: "orders",
+      filters: { tenant_id: data.tenantId, customer_phone: data.customerPhone },
+      max: 3,
+      windowSec: 60 * 60,
+      label: "orders with this phone number",
+    });
+
+    // Record the IP event for throttling
+    await sb.from("auth_throttle_events").insert({ kind: "checkout_ip", key: ip, ip });
+
     const { data: tenant } = await sb
-      .from("tenants").select("id, whatsapp_e164, currency, business_hours, is_accepting_orders, timezone").eq("id", data.tenantId).maybeSingle();
+      .from("tenants").select("id, whatsapp_e164, currency, business_hours, is_accepting_orders, timezone, meta_token, meta_phone_id, meta_template_name").eq("id", data.tenantId).maybeSingle();
     if (!tenant) throw new Error("Store not available");
     const currency = (tenant as any)?.currency ?? "EGP";
 
@@ -725,10 +755,15 @@ export const createOrder = createServerFn({ method: "POST" })
         items: serverItems,
         subtotal_cents: subtotal,
         discount_cents: discountCents,
-        total_cents: Math.max(0, subtotal - discountCents),
+        delivery_fee_cents: data.deliveryFeeCents ?? 0,
+        delivery_area_label: data.deliveryAreaLabel ?? null,
+        total_cents: Math.max(0, subtotal - discountCents) + (data.deliveryFeeCents ?? 0),
         currency,
         promo_code: promoRow?.code ?? null,
         created_at: new Date().toISOString(),
+        meta_token: (tenant as any)?.meta_token ?? null,
+        meta_phone_id: (tenant as any)?.meta_phone_id ?? null,
+        meta_template_name: (tenant as any)?.meta_template_name ?? null,
       },
     }).catch((e: unknown) => console.error("[createOrder] webhook enqueue failed", e));
 

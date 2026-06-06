@@ -90,7 +90,7 @@ const METHODS = {
       label: "Vodafone Cash",
       kind: "wallet",
       account_identifier: "01000000000",
-      account_holder: "CoreWeb LLC",
+      account_holder: "RentWebify LLC",
       instructions: "Send to the number above.",
     },
   ],

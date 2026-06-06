@@ -16,6 +16,10 @@ async function assertAdmin(userId: string) {
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Forbidden: admin only");
+
+  // Optional: Re-auth enforcement logic could be verified here by checking user.last_sign_in_at
+  // const { data: userRes } = await sb.auth.admin.getUserById(userId);
+  // if (userRes?.user?.last_sign_in_at) { ... check against Date.now() - configured_window ... }
 }
 
 // Thin wrapper preserving the existing call sites in this file.
@@ -29,19 +33,160 @@ async function audit(
   await writeAuditLog({ actorId, action, targetTable: table, targetId, diff });
 }
 
+/**
+ * Lightweight admin-claim probe used by the /admin route's `beforeLoad` guard.
+ *
+ * Returns `{ isAdmin: true }` when the authenticated user has the `admin`
+ * role row in `public.user_roles`. Never throws on the "not admin" path —
+ * the route guard expects a boolean, not a redirect.
+ *
+ * This is intentionally cheap: a single indexed lookup by (user_id, role).
+ * For the dashboard's full admin checks (audit log writes, mutations),
+ * use `assertAdmin(userId)` above.
+ */
+export const getMyAdminClaim = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { userId } = context;
+    if (!userId) return { isAdmin: false };
+    const { data, error } = await sb
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (error) {
+      // Don't leak errors to the client; treat as non-admin so the guard
+      // redirects them to the dashboard.
+      console.error("[admin] getMyAdminClaim lookup failed:", error.message);
+      return { isAdmin: false };
+    }
+    return { isAdmin: Boolean(data) };
+  });
+
+/**
+ * Look up an owner email from an account_subscription_id by joining
+ * account_subscriptions.user_id → auth.admin.getUserById. Used in the
+ * account-level flow where there is no tenants.owner_id fallback.
+ */
+async function emailForAccountSubscription(accountSubscriptionId: string): Promise<string | null> {
+  if (!accountSubscriptionId) return null;
+  const { data: sub } = await sb
+    .from("account_subscriptions")
+    .select("user_id")
+    .eq("id", accountSubscriptionId)
+    .maybeSingle();
+  if (!sub?.user_id) return null;
+  const { data: userRes } = await sb.auth.admin.getUserById(sub.user_id);
+  return userRes?.user?.email ?? null;
+}
+
+/**
+ * Fire a tenant-scoped webhook event by resolving the owner's first tenant
+ * (if any). In the new account-level flow, webhooks are typically a per-tenant
+ * concept; if the user has no tenants yet, this is a no-op.
+ */
+async function enqueueOwnerWebhook(args: {
+  userId: string | null;
+  eventType: string;
+  payload: Record<string, unknown>;
+}) {
+  if (!args.userId) return;
+  const { data: tenantRow } = await sb
+    .from("tenants")
+    .select("id")
+    .eq("owner_id", args.userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!tenantRow?.id) return; // no tenant yet — skip
+  await enqueueWebhookEvent({
+    tenantId: tenantRow.id,
+    eventType: args.eventType,
+    payload: args.payload,
+  }).catch((e: unknown) => console.error(`[admin] ${args.eventType} webhook enqueue failed`, e));
+}
+
 // ============== EXISTING: payment proofs ==============
 
 export const listPendingProofs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((input) => z.object({
+    status: z.enum(["all", "pending", "approved", "rejected"]).default("pending"),
+    search: z.string().optional(),
+    page: z.number().int().min(1).default(1),
+    pageSize: z.number().int().min(1).max(100).default(25),
+  }).parse(input))
+  .handler(async ({ data: input, context }) => {
     await assertAdmin(context.userId);
-    const { data, error } = await sb
+    // New flow: proofs are account-level (tenant_id is null). Join to
+    // account_subscriptions (not tenants) and look up the owner via user_id.
+    let q = sb
       .from("payment_proofs")
-      .select("id, status, amount_usd, amount_egp, reference_number, created_at, tenants(name, slug), payment_methods(label, kind), subscriptions(plans(name, interval))")
-      .order("created_at", { ascending: false })
-      .limit(100);
+      .select("id, status, amount_usd, amount_egp, reference_number, created_at, screenshot_path, account_subscription_id, payment_methods(label, kind), account_subscriptions(id, user_id, plans(name, interval))", { count: "exact" });
+
+    if (input.status !== "all") {
+      q = q.eq("status", input.status);
+    }
+
+    if (input.search) {
+      q = q.ilike("reference_number", `%${input.search}%`);
+    }
+
+    const from = (input.page - 1) * input.pageSize;
+    const { data: proofsData, error, count } = await q.order("created_at", { ascending: false }).range(from, from + input.pageSize - 1);
     if (error) throw new Error(error.message);
-    return { proofs: data ?? [] };
+
+    const rows = proofsData ?? [];
+    const proofIds = rows.map((p: any) => p.id);
+
+    // Fetch audits for these proofs to show reviewers' history
+    let allAudits: any[] = [];
+    if (proofIds.length > 0) {
+      const { data: auditData } = await sb
+        .from("audit_logs")
+        .select("id, action, target_id, created_at, diff")
+        .eq("target_table", "payment_proofs")
+        .in("target_id", proofIds)
+        .order("created_at", { ascending: false });
+      allAudits = auditData ?? [];
+    }
+
+    // Resolve owner emails in bulk so the admin UI can show "who paid".
+    const userIds = Array.from(
+      new Set(
+        rows
+          .map((p: any) => p.account_subscriptions?.user_id)
+          .filter(Boolean) as string[],
+      ),
+    );
+    const emailMap = new Map<string, string>();
+    for (const uid of userIds) {
+      const { data: u } = await sb.auth.admin.getUserById(uid);
+      if (u?.user?.email) emailMap.set(uid, u.user.email);
+    }
+
+    const proofs = await Promise.all(rows.map(async (p: any) => {
+      let signedUrl = null;
+      if (p.screenshot_path) {
+        // Fetch secure short-ttl signed URL for the screenshot
+        const { data: urlData } = await sb.storage.from("payment_proofs").createSignedUrl(p.screenshot_path, 3600);
+        signedUrl = urlData?.signedUrl ?? null;
+      }
+
+      const proofAudits = allAudits.filter(a => a.target_id === p.id);
+      const ownerUserId = p.account_subscriptions?.user_id ?? null;
+
+      return {
+        ...p,
+        signedUrl,
+        auditLogs: proofAudits,
+        ownerEmail: ownerUserId ? emailMap.get(ownerUserId) ?? null : null,
+        ownerUserId,
+      };
+    }));
+
+    return { proofs, total: count ?? 0 };
   });
 
 export const reviewPaymentProof = createServerFn({ method: "POST" })
@@ -55,143 +200,146 @@ export const reviewPaymentProof = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const { error } = await sb
+
+    // 1. Load proof and ensure it is pending. In the new flow we join
+    //    account_subscriptions (which carries user_id, plan interval) — not tenants.
+    const { data: proof, error: pErr } = await sb
+      .from("payment_proofs")
+      .select("id, status, account_subscription_id, amount_usd, account_subscriptions(id, user_id, plan_id, status, plans(interval))")
+      .eq("id", data.proofId)
+      .maybeSingle();
+
+    if (pErr) throw new Error(pErr.message);
+    if (!proof) throw new Error("Proof not found");
+
+    // Idempotency: if already decided, return early
+    if (proof.status === data.decision) {
+       return { ok: true, message: "Decision already applied" };
+    }
+    if (proof.status !== "pending" && proof.status !== "review") {
+      throw new Error(`Cannot review proof with status: ${proof.status}`);
+    }
+
+    // 2. Update proof status
+    const { error: updateErr } = await sb
       .from("payment_proofs")
       .update({
         status: data.decision,
         reviewer_id: context.userId,
         reviewer_notes: data.reviewerNotes ?? null,
+        reviewed_at: new Date().toISOString(),
       })
       .eq("id", data.proofId);
-    if (error) throw new Error(error.message);
+    if (updateErr) throw new Error(updateErr.message);
+
     await audit(context.userId, `proof.${data.decision}`, "payment_proofs", data.proofId, { notes: data.reviewerNotes ?? null });
 
-    // On approve: extend subscription period and activate tenant if pending.
-    // On reject: leave subscription alone. Either way, queue a branded email.
-    const { data: proof } = await sb
-      .from("payment_proofs")
-      .select("subscription_id, tenant_id, subscriptions(plan_id, plans(interval)), tenants(name, owner_id)")
-      .eq("id", data.proofId)
-      .maybeSingle();
-
-    if (proof) {
-      if (data.decision === "approved" && proof.subscription_id) {
-        const interval = proof.subscriptions?.plans?.interval ?? "monthly";
-        const now = new Date();
-        const end = new Date(now);
-        if (interval === "yearly") end.setUTCFullYear(end.getUTCFullYear() + 1);
-        else end.setUTCMonth(end.getUTCMonth() + 1);
-        await sb
-          .from("subscriptions")
-          .update({ status: "active", period_start: now.toISOString(), period_end: end.toISOString() })
-          .eq("id", proof.subscription_id);
-        if (proof.tenant_id) {
-          await sb.from("tenants").update({ status: "active" }).eq("id", proof.tenant_id).eq("status", "pending");
-        }
-
-        // ---- Auto-consume any tenant credit balance against this invoice ----
-        if (proof.tenant_id) {
-          const { data: balRow } = await sb
-            .from("tenant_credits")
-            .select("balance_usd")
-            .eq("tenant_id", proof.tenant_id)
-            .maybeSingle();
-          const balance = Number(balRow?.balance_usd ?? 0);
-          if (balance > 0) {
-            // Need invoice amount — fetch from proof row we already have? Not here; reload.
-            const { data: amountRow } = await sb
-              .from("payment_proofs")
-              .select("amount_usd")
-              .eq("id", data.proofId)
-              .maybeSingle();
-            const invoiceAmount = Number(amountRow?.amount_usd ?? 0);
-            const consumed = Math.min(balance, invoiceAmount);
-            if (consumed > 0) {
-              const { error: cErr } = await sb.from("billing_adjustments").insert({
-                tenant_id: proof.tenant_id,
-                subscription_id: proof.subscription_id,
-                kind: "credit_consumed",
-                amount_usd: -consumed,
-                reason: `Auto-applied to proof ${data.proofId}`,
-                actor_id: context.userId,
-              });
-              if (!cErr) {
-                await audit(
-                  context.userId,
-                  "billing.credit_auto_consumed",
-                  "billing_adjustments",
-                  data.proofId,
-                  { consumed_usd: consumed, balance_before: balance },
-                );
-              }
-            }
-          }
+    // 3. Process decision effect on Account Subscription.
+    //    No more "tenants.status = 'pending'" — tenants are only created via
+    //    createTenant AFTER the account subscription is active, and they are
+    //    always inserted with status = 'active' (see billing.functions.ts).
+    if (data.decision === "approved" && proof.account_subscription_id) {
+      const accountSubId: string = proof.account_subscription_id;
+      let interval = proof.account_subscriptions?.plans?.interval;
+      
+      // Robust fallback in case PostgREST nested join drops the interval in some versions
+      if (!interval && proof.account_subscriptions?.plan_id) {
+        const { data: fallbackPlan } = await sb
+          .from("plans")
+          .select("interval")
+          .eq("id", proof.account_subscriptions.plan_id)
+          .maybeSingle();
+        if (fallbackPlan?.interval) {
+          interval = fallbackPlan.interval;
         }
       }
+      interval = interval ?? "monthly";
 
-      // Resolve owner email for the outbox.
-      let toEmail: string | null = null;
-      const ownerId = proof.tenants?.owner_id;
-      if (ownerId) {
-        const { data: userRes } = await sb.auth.admin.getUserById(ownerId);
-        toEmail = userRes?.user?.email ?? null;
+      const now = new Date();
+      const end = new Date(now);
+      if (interval === "yearly") end.setUTCFullYear(end.getUTCFullYear() + 1);
+      else if (interval === "quarterly") end.setUTCMonth(end.getUTCMonth() + 3);
+      else end.setUTCMonth(end.getUTCMonth() + 1);
+
+      // Before activating, cancel any existing active subscriptions for this user to support upgrades
+      const ownerUserId = proof.account_subscriptions?.user_id ?? null;
+      if (ownerUserId) {
+        await sb.from("account_subscriptions")
+          .update({ status: "cancelled" })
+          .eq("user_id", ownerUserId)
+          .eq("status", "active")
+          .neq("id", accountSubId);
       }
-      if (toEmail) {
-        await sb.from("email_outbox").insert({
-          to_email: toEmail,
-          template: data.decision === "approved" ? "payment_proof_approved" : "payment_proof_rejected",
-          payload: {
-            tenant_name: proof.tenants?.name ?? null,
-            reviewer_notes: data.reviewerNotes ?? null,
-          },
-        });
-      }
 
-      // Fire-and-forget webhook notifications.
-      if (proof.tenant_id) {
-        if (data.decision === "approved") {
-          void enqueueWebhookEvent({
-            tenantId: proof.tenant_id,
-            eventType: "payment.approved",
-            payload: {
-              proof_id: data.proofId,
-              tenant_id: proof.tenant_id,
-              subscription_id: proof.subscription_id ?? null,
-              reviewer_notes: data.reviewerNotes ?? null,
-              reviewed_at: new Date().toISOString(),
-            },
-          }).catch((e: unknown) => console.error("[reviewPaymentProof] payment.approved webhook failed", e));
-
-          if (proof.subscription_id) {
-            void enqueueWebhookEvent({
-              tenantId: proof.tenant_id,
-              eventType: "subscription.extended",
-              payload: {
-                subscription_id: proof.subscription_id,
-                tenant_id: proof.tenant_id,
-                proof_id: data.proofId,
-                interval: proof.subscriptions?.plans?.interval ?? "monthly",
-                extended_at: new Date().toISOString(),
-              },
-            }).catch((e: unknown) => console.error("[reviewPaymentProof] subscription.extended webhook failed", e));
-          }
-        } else {
-          void enqueueWebhookEvent({
-            tenantId: proof.tenant_id,
-            eventType: "payment.rejected",
-            payload: {
-              proof_id: data.proofId,
-              tenant_id: proof.tenant_id,
-              subscription_id: proof.subscription_id ?? null,
-              reviewer_notes: data.reviewerNotes ?? null,
-              reviewed_at: new Date().toISOString(),
-            },
-          }).catch((e: unknown) => console.error("[reviewPaymentProof] payment.rejected webhook failed", e));
-        }
+      await sb
+        .from("account_subscriptions")
+        .update({ status: "active", period_start: now.toISOString(), period_end: end.toISOString() })
+        .eq("id", accountSubId);
+    } else if (data.decision === "rejected") {
+      // Revert subscription status to allow them to re-upload. No tenant to
+      // touch — there is no tenant in the new flow until the user provisions one.
+      if (proof.account_subscription_id) {
+        await sb.from("account_subscriptions").update({ status: "pending_payment" }).eq("id", proof.account_subscription_id);
       }
     }
 
-    return { ok: true };
+    // 4. Resolve owner email for outbox queuing. In the new flow the owner
+    //    is the account_subscriptions.user_id, NOT proof.tenants.owner_id.
+    const toEmail = await emailForAccountSubscription(proof.account_subscription_id);
+
+    if (toEmail) {
+      await sb.from("email_outbox").insert({
+        to_email: toEmail,
+        template: data.decision === "approved" ? "payment_proof_approved" : "payment_proof_rejected",
+        payload: {
+          tenant_name: null,
+          reviewer_notes: data.reviewerNotes ?? null,
+        },
+      });
+    }
+
+    // 5. Fire-and-forget webhook notifications. In the new flow, webhooks
+    //    are tenant-scoped; we resolve the owner's first tenant (if any).
+    const ownerUserId = proof.account_subscriptions?.user_id ?? null;
+    if (data.decision === "approved") {
+      await enqueueOwnerWebhook({
+        userId: ownerUserId,
+        eventType: "payment.approved",
+        payload: {
+          proof_id: data.proofId,
+          subscription_id: proof.account_subscription_id ?? null,
+          reviewer_notes: data.reviewerNotes ?? null,
+          reviewed_at: new Date().toISOString(),
+        },
+      });
+
+      if (proof.account_subscription_id) {
+        await enqueueOwnerWebhook({
+          userId: ownerUserId,
+          eventType: "subscription.extended",
+          payload: {
+            subscription_id: proof.account_subscription_id,
+            proof_id: data.proofId,
+            interval: proof.account_subscriptions?.plans?.interval ?? "monthly",
+            extended_at: new Date().toISOString(),
+          },
+        });
+      }
+    } else {
+      await enqueueOwnerWebhook({
+        userId: ownerUserId,
+        eventType: "payment.rejected",
+        payload: {
+          proof_id: data.proofId,
+          subscription_id: proof.account_subscription_id ?? null,
+          reviewer_notes: data.reviewerNotes ?? null,
+          reviewed_at: new Date().toISOString(),
+        },
+      });
+    }
+
+    // Signal frontend cache invalidations
+    return { ok: true, invalidate: ["my-tenants", "admin", "proofs"] };
   });
 
 // ============== TENANTS ==============
@@ -200,7 +348,7 @@ export const listAllTenants = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
-      status: z.enum(["pending", "active", "suspended"]).optional(),
+      status: z.enum(["active", "inactive", "suspended"]).optional(),
       search: z.string().trim().max(80).optional(),
       page: z.number().int().min(1).max(1000).default(1),
       pageSize: z.number().int().min(1).max(100).default(25),
@@ -208,11 +356,13 @@ export const listAllTenants = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
+    // tenant_status enum does not include "pending" — the legacy "pending"
+    // tenants.state is gone. Filter the input schema to the real enum values.
     let q = sb
       .from("tenants")
       .select("id, slug, name, niche, status, created_at, owner_id", { count: "exact" });
     if (data.status) q = q.eq("status", data.status);
-    if (data.search) q = q.or(`name.ilike.%${data.search}%,slug.ilike.%${data.search}%`);
+    if (data.search) q = q.or(`name.ilike.%${data.search}%\,slug.ilike.%${data.search}%`);
     const from = (data.page - 1) * data.pageSize;
     q = q.order("created_at", { ascending: false }).range(from, from + data.pageSize - 1);
     const { data: rows, error, count } = await q;
@@ -225,14 +375,39 @@ export const getTenantDetail = createServerFn({ method: "GET" })
   .inputValidator((i) => z.object({ tenantId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const [{ data: tenant }, { data: subs }, { data: proofs }, { data: audits }] = await Promise.all([
-      sb.from("tenants").select("*").eq("id", data.tenantId).maybeSingle(),
-      sb.from("subscriptions").select("id, status, currency, period_end, created_at, plans(name, slug, interval, price_usd)").eq("tenant_id", data.tenantId).order("created_at", { ascending: false }),
-      sb.from("payment_proofs").select("id, status, amount_usd, amount_egp, reference_number, created_at").eq("tenant_id", data.tenantId).order("created_at", { ascending: false }).limit(50),
-      sb.from("audit_logs").select("id, action, actor_id, diff, created_at").eq("target_table", "tenants").eq("target_id", data.tenantId).order("created_at", { ascending: false }).limit(50),
-    ]);
+    const { data: tenant } = await sb.from("tenants").select("*").eq("id", data.tenantId).maybeSingle();
     if (!tenant) throw new Error("Not found");
-    return { tenant, subscriptions: subs ?? [], proofs: proofs ?? [], audit: audits ?? [] };
+
+    // In the new flow proofs are account-level (tenant_id is always null on new
+    // rows). To still show relevant proofs for this tenant's owner, look up
+    // the owner's account_subscriptions and filter proofs by those IDs.
+    const { data: ownerSubs } = tenant.owner_id
+      ? await sb
+          .from("account_subscriptions")
+          .select("id, status, currency, period_end, created_at, plans(name, slug, interval, price_usd)")
+          .eq("user_id", tenant.owner_id)
+          .order("created_at", { ascending: false })
+      : { data: [] as any[] };
+    const ownerSubIds = (ownerSubs ?? []).map((s: any) => s.id);
+
+    const [{ data: audits }, { data: proofs }] = await Promise.all([
+      sb.from("audit_logs").select("id, action, actor_id, diff, created_at").eq("target_table", "tenants").eq("target_id", data.tenantId).order("created_at", { ascending: false }).limit(50),
+      ownerSubIds.length > 0
+        ? sb
+            .from("payment_proofs")
+            .select("id, status, amount_usd, amount_egp, reference_number, created_at, account_subscription_id")
+            .in("account_subscription_id", ownerSubIds)
+            .order("created_at", { ascending: false })
+            .limit(50)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    return {
+      tenant,
+      subscriptions: ownerSubs ?? [],
+      proofs: proofs ?? [],
+      audit: audits ?? [],
+    };
   });
 
 export const suspendTenant = createServerFn({ method: "POST" })
@@ -249,7 +424,6 @@ export const suspendTenant = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     await audit(context.userId, "tenant.suspend", "tenants", data.tenantId, { reason: data.reason ?? null });
 
-    // Queue suspension email to owner.
     if (tenant?.owner_id) {
       const { data: userRes } = await sb.auth.admin.getUserById(tenant.owner_id);
       const toEmail = userRes?.user?.email ?? null;
@@ -295,7 +469,6 @@ export const forceDeleteTenant = createServerFn({ method: "POST" })
     if (tenant.slug !== data.confirmSlug) {
       throw new Error("confirmSlug does not match tenant slug");
     }
-    // Audit BEFORE the cascade delete (target_id will be orphaned but preserved).
     await audit(context.userId, "tenant.force_delete", "tenants", data.tenantId, {
       slug: tenant.slug,
       name: tenant.name,
@@ -317,7 +490,9 @@ export const upsertPlan = createServerFn({ method: "POST" })
       name: z.string().trim().min(1).max(80),
       description: z.string().trim().max(500).optional().nullable(),
       priceUsd: z.number().min(0).max(100000),
-      interval: z.enum(["monthly", "yearly"]),
+      interval: z.enum(["monthly", "quarterly", "yearly"]),
+      maxStores: z.number().int().min(0).max(1000).default(1),
+      hasCustomDomain: z.boolean().default(false),
       features: z.array(z.string().max(120)).max(50).default([]),
       sortOrder: z.number().int().min(0).max(9999).default(0),
       isActive: z.boolean().default(true),
@@ -325,26 +500,28 @@ export const upsertPlan = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const payload = {
+    const payload: Record<string, unknown> = {
       slug: data.slug,
       name: data.name,
       description: data.description ?? null,
       price_usd: data.priceUsd,
       interval: data.interval,
+      max_stores: data.maxStores,
+      has_custom_domain: data.hasCustomDomain,
       features: data.features,
       sort_order: data.sortOrder,
       is_active: data.isActive,
     };
+    let q;
     if (data.id) {
-      const { error } = await sb.from("plans").update(payload).eq("id", data.id);
-      if (error) throw new Error(error.message);
-      await audit(context.userId, "plan.update", "plans", data.id, payload);
-      return { id: data.id };
+      q = sb.from("plans").update(payload).eq("id", data.id);
+    } else {
+      q = sb.from("plans").insert(payload);
     }
-    const { data: row, error } = await sb.from("plans").insert(payload).select("id").single();
+    const { data: row, error } = await q.select("id").single();
     if (error) throw new Error(error.message);
-    await audit(context.userId, "plan.create", "plans", row.id, payload);
-    return { id: row.id };
+    await audit(context.userId, data.id ? "plan.update" : "plan.create", "plans", row.id, { slug: data.slug });
+    return { ok: true, planId: row.id };
   });
 
 export const togglePlanActive = createServerFn({ method: "POST" })
@@ -354,8 +531,36 @@ export const togglePlanActive = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const { error } = await sb.from("plans").update({ is_active: data.isActive }).eq("id", data.id);
     if (error) throw new Error(error.message);
-    await audit(context.userId, "plan.toggle", "plans", data.id, { isActive: data.isActive });
+    await audit(context.userId, "plan.toggle", "plans", data.id, { is_active: data.isActive });
     return { ok: true };
+  });
+
+export const deletePlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    // Block delete if any account_subscription references this plan.
+    const { count } = await sb
+      .from("account_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("plan_id", data.id);
+    if ((count ?? 0) > 0) {
+      throw new Error("Cannot delete a plan that has active or historical subscriptions. Mark it inactive instead.");
+    }
+    const { error } = await sb.from("plans").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "plan.delete", "plans", data.id);
+    return { ok: true };
+  });
+
+export const listPlansAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const { data, error } = await sb.from("plans").select("*").order("sort_order").order("price_usd");
+    if (error) throw new Error(error.message);
+    return { plans: data ?? [] };
   });
 
 // ============== PAYMENT METHODS ==============
@@ -367,7 +572,7 @@ export const upsertPaymentMethod = createServerFn({ method: "POST" })
       id: z.string().uuid().optional(),
       kind: z.enum(["instapay", "vodafone_cash", "bank_transfer"]),
       label: z.string().trim().min(1).max(80),
-      accountIdentifier: z.string().trim().max(120).optional().nullable(),
+      accountIdentifier: z.string().trim().min(1).max(120),
       accountHolder: z.string().trim().max(120).optional().nullable(),
       instructions: z.string().trim().max(1000).optional().nullable(),
       sortOrder: z.number().int().min(0).max(9999).default(0),
@@ -376,25 +581,22 @@ export const upsertPaymentMethod = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const payload = {
+    const payload: Record<string, unknown> = {
       kind: data.kind,
       label: data.label,
-      account_identifier: data.accountIdentifier ?? null,
+      account_identifier: data.accountIdentifier,
       account_holder: data.accountHolder ?? null,
       instructions: data.instructions ?? null,
       sort_order: data.sortOrder,
       is_active: data.isActive,
     };
-    if (data.id) {
-      const { error } = await sb.from("payment_methods").update(payload).eq("id", data.id);
-      if (error) throw new Error(error.message);
-      await audit(context.userId, "payment_method.update", "payment_methods", data.id, payload);
-      return { id: data.id };
-    }
-    const { data: row, error } = await sb.from("payment_methods").insert(payload).select("id").single();
+    const q = data.id
+      ? sb.from("payment_methods").update(payload).eq("id", data.id)
+      : sb.from("payment_methods").insert(payload);
+    const { data: row, error } = await q.select("id").single();
     if (error) throw new Error(error.message);
-    await audit(context.userId, "payment_method.create", "payment_methods", row.id, payload);
-    return { id: row.id };
+    await audit(context.userId, data.id ? "payment_method.update" : "payment_method.create", "payment_methods", row.id, { label: data.label });
+    return { ok: true, paymentMethodId: row.id };
   });
 
 export const togglePaymentMethodActive = createServerFn({ method: "POST" })
@@ -404,8 +606,28 @@ export const togglePaymentMethodActive = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const { error } = await sb.from("payment_methods").update({ is_active: data.isActive }).eq("id", data.id);
     if (error) throw new Error(error.message);
-    await audit(context.userId, "payment_method.toggle", "payment_methods", data.id, { isActive: data.isActive });
+    await audit(context.userId, "payment_method.toggle", "payment_methods", data.id, { is_active: data.isActive });
     return { ok: true };
+  });
+
+export const deletePaymentMethod = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await sb.from("payment_methods").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "payment_method.delete", "payment_methods", data.id);
+    return { ok: true };
+  });
+
+export const listPaymentMethodsAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const { data, error } = await sb.from("payment_methods").select("*").order("sort_order");
+    if (error) throw new Error(error.message);
+    return { methods: data ?? [] };
   });
 
 // ============== FX RATES ==============
@@ -414,8 +636,8 @@ export const insertFxRate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
-      baseCurrency: z.string().trim().length(3).default("USD"),
-      quoteCurrency: z.string().trim().length(3).default("EGP"),
+      baseCurrency: z.string().trim().min(3).max(8).default("USD"),
+      quoteCurrency: z.string().trim().min(3).max(8).default("EGP"),
       rate: z.number().positive().max(100000),
       effectiveAt: z.string().datetime().optional(),
     }).parse(i),
@@ -425,16 +647,40 @@ export const insertFxRate = createServerFn({ method: "POST" })
     const { data: row, error } = await sb
       .from("fx_rates")
       .insert({
-        base_currency: data.baseCurrency.toUpperCase(),
-        quote_currency: data.quoteCurrency.toUpperCase(),
+        base_currency: data.baseCurrency,
+        quote_currency: data.quoteCurrency,
         rate: data.rate,
-        ...(data.effectiveAt ? { effective_at: data.effectiveAt } : {}),
+        effective_at: data.effectiveAt ?? new Date().toISOString(),
       })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    await audit(context.userId, "fx.insert", "fx_rates", row.id, { rate: data.rate });
-    return { id: row.id };
+    await audit(context.userId, "fx_rate.insert", "fx_rates", row.id, { rate: data.rate, base: data.baseCurrency, quote: data.quoteCurrency });
+    return { ok: true, fxRateId: row.id };
+  });
+
+export const listFxRates = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({
+      baseCurrency: z.string().trim().min(3).max(8).default("USD"),
+      quoteCurrency: z.string().trim().min(3).max(8).default("EGP"),
+      page: z.number().int().min(1).max(1000).default(1),
+      pageSize: z.number().int().min(1).max(100).default(50),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const from = (data.page - 1) * data.pageSize;
+    const { data: rows, error, count } = await sb
+      .from("fx_rates")
+      .select("*", { count: "exact" })
+      .eq("base_currency", data.baseCurrency)
+      .eq("quote_currency", data.quoteCurrency)
+      .order("effective_at", { ascending: false })
+      .range(from, from + data.pageSize - 1);
+    if (error) throw new Error(error.message);
+    return { rates: rows ?? [], total: count ?? 0 };
   });
 
 // ============== FEATURE FLAGS ==============
@@ -450,56 +696,61 @@ export const listFeatureFlags = createServerFn({ method: "GET" })
 
 export const toggleFeatureFlag = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ key: z.string().min(1).max(120), enabled: z.boolean() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await sb.from("feature_flags").update({ enabled: data.enabled }).eq("key", data.key);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "feature_flag.toggle", "feature_flags", null, { key: data.key, enabled: data.enabled });
+    return { ok: true };
+  });
+
+export const setFeatureFlagRollout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
-      key: z.string().trim().min(1).max(80).regex(/^[a-z0-9_.-]+$/),
-      enabled: z.boolean(),
-      rolloutPercent: z.number().int().min(0).max(100).optional(),
-      description: z.string().max(500).optional(),
+      key: z.string().min(1).max(120),
+      rolloutPct: z.number().int().min(0).max(100),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const payload: any = { key: data.key, enabled: data.enabled, updated_by: context.userId };
-    if (data.rolloutPercent !== undefined) payload.rollout_percent = data.rolloutPercent;
-    if (data.description !== undefined) payload.description = data.description;
-    const { error } = await sb.from("feature_flags").upsert(payload, { onConflict: "key" });
+    const { error } = await sb.from("feature_flags").update({ rollout_pct: data.rolloutPct }).eq("key", data.key);
     if (error) throw new Error(error.message);
-    await audit(context.userId, "flag.toggle", "feature_flags", null, payload);
+    await audit(context.userId, "feature_flag.rollout", "feature_flags", null, { key: data.key, rollout_pct: data.rolloutPct });
     return { ok: true };
   });
 
-// ============== AUDIT + ERRORS ==============
+// ============== AUDIT LOG ==============
 
 export const listAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
-      actorId: z.string().uuid().optional(),
-      targetTable: z.string().max(60).optional(),
-      page: z.number().int().min(1).max(1000).default(1),
+      page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(50),
+      action: z.string().max(120).optional(),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    let q = sb.from("audit_logs").select("*", { count: "exact" });
-    if (data.actorId) q = q.eq("actor_id", data.actorId);
-    if (data.targetTable) q = q.eq("target_table", data.targetTable);
     const from = (data.page - 1) * data.pageSize;
-    q = q.order("created_at", { ascending: false }).range(from, from + data.pageSize - 1);
-    const { data: rows, error, count } = await q;
+    let q = sb.from("audit_logs").select("*", { count: "exact" });
+    if (data.action) q = q.eq("action", data.action);
+    const { data: rows, error, count } = await q.order("created_at", { ascending: false }).range(from, from + data.pageSize - 1);
     if (error) throw new Error(error.message);
     return { entries: rows ?? [], total: count ?? 0 };
   });
+
+// ============== ERROR REPORTS ==============
 
 export const listErrorReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
-      scope: z.enum(["client", "server"]).optional(),
-      page: z.number().int().min(1).max(1000).default(1),
+      page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(50),
+      scope: z.enum(["client", "server", "edge"]).optional(),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
@@ -511,6 +762,81 @@ export const listErrorReports = createServerFn({ method: "GET" })
     const { data: rows, error, count } = await q;
     if (error) throw new Error(error.message);
     return { entries: rows ?? [], total: count ?? 0 };
+  });
+
+export const markErrorResolved = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({
+      id: z.string().uuid(),
+      resolved: z.boolean().default(true),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const updates: Record<string, unknown> = {
+      resolved: data.resolved,
+      resolved_at: data.resolved ? new Date().toISOString() : null,
+      resolved_by: data.resolved ? context.userId : null,
+    };
+    const { error } = await sb.from("error_reports").update(updates).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, data.resolved ? "error_report.resolve" : "error_report.reopen", "error_reports", data.id);
+    return { ok: true };
+  });
+
+// ============== EMAIL TEMPLATES ==============
+
+export const listEmailTemplates = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const { data, error } = await sb.from("email_templates").select("*").order("key");
+    if (error) throw new Error(error.message);
+    return { templates: data ?? [] };
+  });
+
+export const upsertEmailTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({
+      key: z.string().trim().min(1).max(120),
+      subject: z.string().trim().min(1).max(200),
+      bodyHtml: z.string().max(50000),
+      bodyText: z.string().max(50000).optional().nullable(),
+      isActive: z.boolean().default(true),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { data: existing } = await sb
+      .from("email_templates")
+      .select("id")
+      .eq("key", data.key)
+      .maybeSingle();
+    const payload: Record<string, unknown> = {
+      key: data.key,
+      subject: data.subject,
+      body_html: data.bodyHtml,
+      body_text: data.bodyText ?? null,
+      is_active: data.isActive,
+    };
+    let rowId: string;
+    if (existing) {
+      const { error } = await sb.from("email_templates").update(payload).eq("id", existing.id);
+      if (error) throw new Error(error.message);
+      rowId = existing.id;
+    } else {
+      const { data: row, error } = await sb
+        .from("email_templates")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      rowId = row.id;
+    }
+    await audit(context.userId, existing ? "email_template.update" : "email_template.create", "email_templates", rowId, { key: data.key });
+    return { ok: true, templateId: rowId };
   });
 
 // ============== KPIs ==============
@@ -538,8 +864,8 @@ export const getAdminDashboardKPIs = createServerFn({ method: "GET" })
       sb.from("tenants").select("*", { count: "exact", head: true }),
       sb.from("tenants").select("*", { count: "exact", head: true }).gt("created_at", since30),
       sb.from("tenants").select("*", { count: "exact", head: true }).eq("status", "active").gt("created_at", since30),
-      sb.from("subscriptions").select("*", { count: "exact", head: true }).eq("status", "cancelled").gt("updated_at", since30),
-      sb.from("subscriptions")
+      sb.from("account_subscriptions").select("*", { count: "exact", head: true }).eq("status", "cancelled").gt("updated_at", since30),
+      sb.from("account_subscriptions")
         .select("plans(price_usd, interval)")
         .eq("status", "active")
         .or(`period_end.is.null,period_end.gt.${nowIso}`),
@@ -554,15 +880,19 @@ export const getAdminDashboardKPIs = createServerFn({ method: "GET" })
     for (const s of (activeSubs ?? []) as any[]) {
       const p = s.plans;
       if (!p) continue;
-      const monthly = p.interval === "yearly" ? p.price_usd / 12 : p.price_usd;
-      mrrUsd += Number(monthly) || 0;
+      const interval = String(p.interval ?? "monthly");
+      const price = Number(p.price_usd ?? 0);
+      // Normalize any interval to a monthly equivalent.
+      const monthly =
+        interval === "yearly" ? price / 12
+        : interval === "quarterly" ? price / 3
+        : price;
+      mrrUsd += Number.isFinite(monthly) ? monthly : 0;
     }
 
-    // Aggregate weekly revenue (12-week sparkline).
     const weekly = new Map<string, number>();
     for (const r of (revenueRows ?? []) as any[]) {
       const d = new Date(r.created_at);
-      // ISO week-start (Monday)
       const day = d.getUTCDay();
       const diff = (day + 6) % 7;
       const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - diff));
@@ -589,168 +919,7 @@ export const getAdminDashboardKPIs = createServerFn({ method: "GET" })
       newTenants30d: tenantsStarted30d,
       activatedTenants30d: tenantsActivated30d,
       churned30d: churned30d ?? 0,
-      conversionRate, // percent
+      conversionRate,
       revenueTimeline,
     };
-  });
-
-// ============== ADMIN LIST READS ==============
-
-export const listPlansAdmin = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
-    const { data, error } = await sb.from("plans").select("*").order("sort_order").order("price_usd");
-    if (error) throw new Error(error.message);
-    return { plans: data ?? [] };
-  });
-
-export const deletePlan = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
-    const { error } = await sb.from("plans").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
-    await audit(context.userId, "plan.delete", "plans", data.id);
-    return { ok: true };
-  });
-
-export const listPaymentMethodsAdmin = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
-    const { data, error } = await sb.from("payment_methods").select("*").order("sort_order");
-    if (error) throw new Error(error.message);
-    return { methods: data ?? [] };
-  });
-
-export const deletePaymentMethod = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
-    const { error } = await sb.from("payment_methods").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
-    await audit(context.userId, "payment_method.delete", "payment_methods", data.id);
-    return { ok: true };
-  });
-
-export const listFxRates = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
-    const { data, error } = await sb
-      .from("fx_rates")
-      .select("*")
-      .order("effective_at", { ascending: false })
-      .limit(100);
-    if (error) throw new Error(error.message);
-    return { rates: data ?? [] };
-  });
-
-// Get current admin's claim — used by the /admin guard
-export const getMyAdminClaim = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await sb
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId)
-      .eq("role", "admin")
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    return { isAdmin: !!data };
-  });
-
-// ============== FEATURE FLAGS — rollout ==============
-
-export const setFeatureFlagRollout = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
-    z.object({
-      key: z.string().trim().min(1).max(80).regex(/^[a-z0-9_.-]+$/),
-      rolloutPercent: z.number().int().min(0).max(100),
-    }).parse(i),
-  )
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
-    const { error } = await sb
-      .from("feature_flags")
-      .update({ rollout_percent: data.rolloutPercent, updated_by: context.userId })
-      .eq("key", data.key);
-    if (error) throw new Error(error.message);
-    await audit(context.userId, "flag.rollout", "feature_flags", null, {
-      key: data.key,
-      rollout_percent: data.rolloutPercent,
-    });
-    return { ok: true };
-  });
-
-// ============== ERROR REPORTS — mark resolved ==============
-
-export const markErrorResolved = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
-    z.object({
-      id: z.string().uuid(),
-      resolved: z.boolean().default(true),
-    }).parse(i),
-  )
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
-    const { error } = await sb
-      .from("error_reports")
-      .update({
-        resolved: data.resolved,
-        resolved_at: data.resolved ? new Date().toISOString() : null,
-        resolved_by: data.resolved ? context.userId : null,
-      })
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-    await audit(context.userId, data.resolved ? "error.resolve" : "error.reopen", "error_reports", data.id);
-    return { ok: true };
-  });
-
-// ============== EMAIL TEMPLATES ==============
-
-export const listEmailTemplates = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
-    const { data, error } = await sb
-      .from("email_templates")
-      .select("*")
-      .order("key");
-    if (error) throw new Error(error.message);
-    return { templates: data ?? [] };
-  });
-
-export const upsertEmailTemplate = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
-    z.object({
-      key: z.string().trim().min(1).max(80).regex(/^[a-z0-9_.-]+$/),
-      subject: z.string().trim().min(1).max(200),
-      bodyHtml: z.string().min(1).max(50_000),
-      bodyText: z.string().max(50_000).optional().nullable(),
-      description: z.string().max(500).optional().nullable(),
-    }).parse(i),
-  )
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
-    const payload = {
-      key: data.key,
-      subject: data.subject,
-      body_html: data.bodyHtml,
-      body_text: data.bodyText ?? null,
-      description: data.description ?? null,
-      updated_by: context.userId,
-    };
-    const { error } = await sb
-      .from("email_templates")
-      .upsert(payload, { onConflict: "key" });
-    if (error) throw new Error(error.message);
-    await audit(context.userId, "email_template.upsert", "email_templates", null, { key: data.key });
-    return { ok: true };
   });

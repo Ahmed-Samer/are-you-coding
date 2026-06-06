@@ -99,7 +99,7 @@ export function CartProvider({ tenantId, children }: { tenantId: string; childre
       // session id was cleared (e.g. user wiped storage partially, or a
       // previous tenant's data lingered), drop the stale items so they
       // can't leak into a different shopper's session.
-      const sessionRaw = localStorage.getItem(`cart-session:${tenantId}`);
+      const sessionRaw = localStorage.getItem(`cart:session:${tenantId}`);
       const raw = localStorage.getItem(storageKey);
       if (raw && !sessionRaw) {
         localStorage.removeItem(storageKey);

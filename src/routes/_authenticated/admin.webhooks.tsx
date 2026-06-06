@@ -3,11 +3,8 @@ import { lazy, Suspense } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const WebhooksKPIs = lazy(() =>
-  import("@/components/admin/webhooks/WebhooksKPIs").then((m) => ({ default: m.WebhooksKPIs })),
-);
 const WebhookEventsTable = lazy(() =>
-  import("@/components/admin/webhooks/WebhookEventsTable").then((m) => ({ default: m.WebhookEventsTable })),
+  import("@/components/admin/webhooks/WebhookEventsTable").then((m) => ({ default: m.WebhookEventsTable }))
 );
 
 export const Route = createFileRoute("/_authenticated/admin/webhooks")({
@@ -17,21 +14,18 @@ export const Route = createFileRoute("/_authenticated/admin/webhooks")({
       <div className="text-sm text-destructive">{error.message}</div>
     </AdminShell>
   ),
-  component: WebhooksPage,
+  component: AdminWebhooksPage,
 });
 
-function WebhooksPage() {
+function AdminWebhooksPage() {
   return (
     <AdminShell
-      title="Webhooks"
-      description="Monitor outbound webhook delivery, inspect failed payloads, and trigger manual retries."
+      title="Webhooks & Integrations"
+      description="Manage automated HTTP push APIs and monitor outgoing event delivery."
       breadcrumbs={[{ label: "Webhooks" }]}
     >
-      <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-        <div className="space-y-6">
-          <WebhooksKPIs windowDays={1} />
-          <WebhookEventsTable />
-        </div>
+      <Suspense fallback={<Skeleton className="h-[500px] w-full rounded-xl" />}>
+        <WebhookEventsTable />
       </Suspense>
     </AdminShell>
   );

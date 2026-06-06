@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useSuspenseQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Check, Download, Image as ImageIcon, Search, X } from "lucide-react";
+import { z } from "zod";
+import { Check, Download, Image as ImageIcon, Search, X, ZoomIn } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,37 +30,35 @@ import { listPendingProofs, reviewPaymentProof } from "@/lib/admin.functions";
 import { downloadCsv, timeAgo } from "@/lib/admin-utils";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
-type Proof = {
-  id: string;
-  status: "pending" | "approved" | "rejected";
-  amount_usd: number | null;
-  amount_egp: number | null;
-  reference_number: string | null;
-  created_at: string;
-  tenants?: { name: string; slug: string } | null;
-  payment_methods?: { label: string; kind: string } | null;
-  subscriptions?: { plans?: { name: string; interval: string } | null } | null;
-};
-
-const proofsQuery = queryOptions({
-  queryKey: ["admin", "proofs", "all"],
-  queryFn: () => listPendingProofs(),
+const searchSchema = z.object({
+  status: z.enum(["all", "pending", "approved", "rejected"]).default("pending").catch("pending"),
+  q: z.string().optional(),
+  page: z.number().int().min(1).default(1).catch(1),
 });
 
+const proofsQuery = (opts: z.infer<typeof searchSchema>) =>
+  queryOptions({
+    queryKey: ["admin", "proofs", opts],
+    queryFn: () => listPendingProofs({ data: { status: opts.status, search: opts.q, page: opts.page, pageSize: 25 } }),
+    placeholderData: keepPreviousData,
+  });
+
 export const Route = createFileRoute("/_authenticated/admin/payments")({
+  validateSearch: searchSchema,
   head: () => ({ meta: [{ title: "Admin — Payment proofs" }] }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(proofsQuery),
+  loaderDeps: ({ search }) => search,
+  loader: ({ context, deps }) => context.queryClient.ensureQueryData(proofsQuery(deps)),
   component: AdminPaymentsPage,
 });
 
-const TABS: { key: Proof["status"] | "all"; label: string }[] = [
+const TABS = [
   { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
   { key: "approved", label: "Approved" },
   { key: "rejected", label: "Rejected" },
-];
+] as const;
 
-function statusVariant(s: Proof["status"]): "default" | "secondary" | "destructive" | "outline" {
+function statusVariant(s: string) {
   if (s === "approved") return "default";
   if (s === "pending") return "secondary";
   if (s === "rejected") return "destructive";
@@ -67,50 +66,44 @@ function statusVariant(s: Proof["status"]): "default" | "secondary" | "destructi
 }
 
 export function AdminPaymentsPage() {
-  const { data } = useSuspenseQuery(proofsQuery);
+  const searchParams = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const { data } = useSuspenseQuery(proofsQuery(searchParams));
   const qc = useQueryClient();
   const reviewFn = useServerFn(reviewPaymentProof);
-  const proofs = (data.proofs ?? []) as Proof[];
+  const proofs = data.proofs ?? [];
+  const total = data.total ?? 0;
 
   const review = useMutation({
     mutationFn: (input: { proofId: string; decision: "approved" | "rejected"; reviewerNotes?: string }) =>
       reviewFn({ data: input }),
-    onSuccess: (_r, vars) => {
+    onSuccess: (res, vars) => {
       toast.success(`Proof ${vars.decision}`);
-      qc.invalidateQueries({ queryKey: ["admin"] });
+      if (res.invalidate) {
+        res.invalidate.forEach((key) => qc.invalidateQueries({ queryKey: [key] }));
+      }
+      qc.invalidateQueries({ queryKey: ["admin", "proofs"] });
+      setActiveId(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const [tab, setTab] = useState<Proof["status"] | "all">("pending");
-  const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [bulkConfirm, setBulkConfirm] = useState<null | "approved" | "rejected">(null);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [localQuery, setLocalQuery] = useState(searchParams.q ?? "");
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return proofs.filter((p) => {
-      if (tab !== "all" && p.status !== tab) return false;
-      if (!q) return true;
-      return (
-        p.tenants?.name?.toLowerCase().includes(q) ||
-        p.tenants?.slug?.toLowerCase().includes(q) ||
-        p.reference_number?.toLowerCase().includes(q)
-      );
-    });
-  }, [proofs, tab, query]);
-
-  const counts = useMemo(
-    () => ({
-      all: proofs.length,
-      pending: proofs.filter((p) => p.status === "pending").length,
-      approved: proofs.filter((p) => p.status === "approved").length,
-      rejected: proofs.filter((p) => p.status === "rejected").length,
-    }),
-    [proofs],
-  );
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (localQuery !== searchParams.q) {
+        navigate({ search: (s) => ({ ...s, q: localQuery || undefined, page: 1 }) });
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [localQuery, navigate, searchParams.q]);
 
   const active = activeId ? proofs.find((p) => p.id === activeId) ?? null : null;
 
@@ -124,20 +117,19 @@ export function AdminPaymentsPage() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (!filtered.length) return;
-      const idx = activeId ? filtered.findIndex((p) => p.id === activeId) : -1;
-      if (e.key === "j") setActiveId(filtered[Math.min(filtered.length - 1, idx + 1)]?.id ?? filtered[0].id);
-      if (e.key === "k") setActiveId(filtered[Math.max(0, idx - 1)]?.id ?? filtered[0].id);
+      if (!proofs.length) return;
+      const idx = activeId ? proofs.findIndex((p) => p.id === activeId) : -1;
+      if (e.key === "j") setActiveId(proofs[Math.min(proofs.length - 1, idx + 1)]?.id ?? proofs[0].id);
+      if (e.key === "k") setActiveId(proofs[Math.max(0, idx - 1)]?.id ?? proofs[0].id);
       if ((e.key === "a" || e.key === "r") && active?.status === "pending") {
         decide([active.id], e.key === "a" ? "approved" : "rejected");
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, activeId, active]);
+  }, [proofs, activeId, active]);
 
-  const allChecked = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
+  const allChecked = proofs.length > 0 && proofs.every((p) => selected.has(p.id));
 
   return (
     <AdminShell
@@ -151,9 +143,9 @@ export function AdminPaymentsPage() {
           onClick={() =>
             downloadCsv(
               "payment-proofs.csv",
-              filtered.map((p) => ({
+              proofs.map((p) => ({
                 tenant: p.tenants?.name ?? "",
-                plan: p.subscriptions?.plans?.name ?? "",
+                plan: p.account_subscriptions?.plans?.name ?? "",
                 method: p.payment_methods?.label ?? "",
                 reference: p.reference_number ?? "",
                 amount_usd: p.amount_usd ?? 0,
@@ -174,25 +166,25 @@ export function AdminPaymentsPage() {
             {TABS.map((t) => (
               <button
                 key={t.key}
-                onClick={() => { setTab(t.key); setSelected(new Set()); }}
+                onClick={() => {
+                  navigate({ search: (s) => ({ ...s, status: t.key, page: 1 }) });
+                  setSelected(new Set());
+                }}
                 className={
                   "px-3 h-7 text-xs rounded inline-flex items-center gap-1.5 transition-colors " +
-                  (tab === t.key ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")
+                  (searchParams.status === t.key ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")
                 }
               >
                 {t.label}
-                <span className={"tabular-nums " + (tab === t.key ? "text-background/70" : "text-muted-foreground")}>
-                  {counts[t.key]}
-                </span>
               </button>
             ))}
           </div>
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
-              placeholder="Search tenant or reference…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search reference..."
+              value={localQuery}
+              onChange={(e) => setLocalQuery(e.target.value)}
               className="pl-8 h-9"
             />
           </div>
@@ -219,7 +211,7 @@ export function AdminPaymentsPage() {
                 <Checkbox
                   checked={allChecked}
                   onCheckedChange={(v) => {
-                    if (v) setSelected(new Set(filtered.map((p) => p.id)));
+                    if (v) setSelected(new Set(proofs.map((p) => p.id)));
                     else setSelected(new Set());
                   }}
                 />
@@ -235,7 +227,7 @@ export function AdminPaymentsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((p) => (
+            {proofs.map((p) => (
               <TableRow
                 key={p.id}
                 data-state={activeId === p.id ? "selected" : undefined}
@@ -260,9 +252,9 @@ export function AdminPaymentsPage() {
                   <div className="text-xs text-muted-foreground font-mono">/{p.tenants?.slug ?? ""}</div>
                 </TableCell>
                 <TableCell className="text-sm">
-                  {p.subscriptions?.plans?.name ?? "—"}
-                  {p.subscriptions?.plans?.interval && (
-                    <span className="text-muted-foreground"> · {p.subscriptions.plans.interval}</span>
+                  {p.account_subscriptions?.plans?.name ?? "—"}
+                  {p.account_subscriptions?.plans?.interval && (
+                    <span className="text-muted-foreground"> · {p.account_subscriptions.plans.interval}</span>
                   )}
                 </TableCell>
                 <TableCell className="text-sm">{p.payment_methods?.label ?? "—"}</TableCell>
@@ -275,15 +267,41 @@ export function AdminPaymentsPage() {
                 <TableCell className="text-right pr-4 text-xs text-muted-foreground">{timeAgo(p.created_at)}</TableCell>
               </TableRow>
             ))}
-            {!filtered.length && (
+            {!proofs.length && (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-12 text-sm text-muted-foreground">
-                  Nothing in this tab right now.
+                  Nothing found.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+
+        {total > 25 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+            <div className="text-sm text-muted-foreground">
+              Showing {(searchParams.page - 1) * 25 + 1} to {Math.min(searchParams.page * 25, total)} of {total}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={searchParams.page <= 1}
+                onClick={() => navigate({ search: (s) => ({ ...s, page: s.page - 1 }) })}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={searchParams.page * 25 >= total}
+                onClick={() => navigate({ search: (s) => ({ ...s, page: s.page + 1 }) })}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <Sheet open={!!active} onOpenChange={(o) => !o && setActiveId(null)}>
@@ -293,7 +311,7 @@ export function AdminPaymentsPage() {
               <SheetHeader>
                 <SheetTitle>{active.tenants?.name ?? "Payment proof"}</SheetTitle>
                 <SheetDescription>
-                  {active.subscriptions?.plans?.name ?? "Plan"} · ref{" "}
+                  {active.account_subscriptions?.plans?.name ?? "Plan"} · ref{" "}
                   <span className="font-mono">{active.reference_number ?? "—"}</span>
                 </SheetDescription>
               </SheetHeader>
@@ -319,12 +337,35 @@ export function AdminPaymentsPage() {
                   </div>
                 </div>
 
-                <div className="rounded-md border border-border bg-muted/30 aspect-[3/4] grid place-items-center overflow-hidden">
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground text-xs">
-                    <ImageIcon className="size-6" />
-                    No screenshot attached
-                  </div>
+                <div className="rounded-md border border-border bg-muted/30 aspect-[3/4] relative group overflow-hidden flex flex-col items-center justify-center">
+                  {active.signedUrl ? (
+                    <>
+                      <img src={active.signedUrl} alt="Proof" className="object-cover w-full h-full cursor-zoom-in" onClick={() => setZoomImage(active.signedUrl)} />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                         <ZoomIn className="text-white size-8" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground text-xs">
+                      <ImageIcon className="size-6" />
+                      No screenshot attached
+                    </div>
+                  )}
                 </div>
+
+                {active.auditLogs?.length > 0 && (
+                   <div className="mt-4">
+                     <h4 className="text-sm font-medium mb-2 text-foreground">Audit Trail</h4>
+                     <ul className="space-y-2 text-xs">
+                       {active.auditLogs.map((log: any) => (
+                         <li key={log.id} className="bg-muted/50 p-3 rounded-md border border-border">
+                           <span className="font-semibold text-primary capitalize">{log.action.replace("proof.", "")}</span> on <span className="text-muted-foreground">{new Date(log.created_at).toLocaleString()}</span>
+                           {log.diff?.notes && <p className="mt-1.5 text-muted-foreground border-l-2 border-primary/30 pl-2">"{log.diff.notes}"</p>}
+                         </li>
+                       ))}
+                     </ul>
+                   </div>
+                )}
 
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Reviewer notes</label>
@@ -338,7 +379,7 @@ export function AdminPaymentsPage() {
               </div>
 
               {active.status === "pending" && (
-                <div className="mt-6 flex items-center justify-end gap-2 px-4">
+                <div className="mt-6 flex items-center justify-end gap-2 px-4 pb-6">
                   <Button variant="outline" disabled={review.isPending} onClick={() => decide([active.id], "rejected")}>
                     <X className="size-4" /> Reject (R)
                   </Button>
@@ -351,6 +392,12 @@ export function AdminPaymentsPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      {zoomImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={() => setZoomImage(null)}>
+           <img src={zoomImage} alt="Zoomed proof" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" />
+        </div>
+      )}
 
       <ConfirmDialog
         open={!!bulkConfirm}

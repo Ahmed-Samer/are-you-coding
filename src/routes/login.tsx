@@ -25,10 +25,6 @@ const LoginMfaChallenge = lazy(() => import("@/components/auth/LoginMfaChallenge
 
 const searchSchema = z.object({
   redirect: z.string().optional(),
-  // Mirrors Signup/Forgot Password so a `/login?plan=growth&redirect=…`
-  // link (e.g. from a marketing email) round-trips the plan intact instead
-  // of having it stripped by zodValidator before the "Create an account"
-  // and "Forgot?" links are rendered.
   plan: z.string().max(64).optional(),
 });
 
@@ -41,8 +37,8 @@ type FormValues = z.infer<typeof schema>;
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign in — CoreWeb" },
-      { name: "description", content: "Sign in to manage your CoreWeb store." },
+      { title: "Sign in — RentWebify" },
+      { name: "description", content: "Sign in to manage your RentWebify store." },
     ],
   }),
   validateSearch: searchSchema,
@@ -61,9 +57,7 @@ export function LoginPage() {
   const search = useSearch({ from: "/login" });
   const redirectTo = safeRedirect(search.redirect);
   const plan = search.plan;
-  // Outbound `Link`s forward both `redirect` and `plan` so the user's
-  // intent (post-auth destination AND chosen plan) survives the trip
-  // through Signup / Forgot Password.
+  
   const linkSearch = (() => {
     const s: Record<string, string> = {};
     if (search.redirect) s.redirect = search.redirect;
@@ -101,14 +95,12 @@ export function LoginPage() {
 
   const emailReg = register("email");
 
-  // 1-second local ticker — decrements toward zero.
   useEffect(() => {
     if (cooldown <= 0) return;
     const t = setInterval(() => setCooldown((c) => Math.max(0, c - 1)), 1000);
     return () => clearInterval(t);
   }, [cooldown]);
 
-  // Server-authoritative cooldown sync.
   const syncThrottle = async (email?: string) => {
     try {
       const { retryAfterSec } = await getThrottleStateFn({
@@ -116,17 +108,14 @@ export function LoginPage() {
       });
       setCooldown(retryAfterSec);
     } catch {
-      // ignore — local ticker still applies
+      // ignore
     }
   };
 
-  // Mount sync.
   useEffect(() => {
     void syncThrottle();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-sync every 10s while a cooldown is active so reloads/tabs see truth.
   const cooldownActive = cooldown > 0;
   useEffect(() => {
     if (!cooldownActive) return;
@@ -134,15 +123,12 @@ export function LoginPage() {
       void syncThrottle(lastEmail.current || undefined);
     }, 10_000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cooldownActive]);
 
-  // Autofocus email on mount of the form view.
   useEffect(() => {
     if (!mfa) emailInputRef.current?.focus();
   }, [mfa]);
 
-  // Lightweight focus trap for the form view.
   useEffect(() => {
     if (mfa) return;
     const node = formContainerRef.current;
@@ -169,7 +155,6 @@ export function LoginPage() {
   }, [mfa]);
 
   const completeLogin = async () => {
-    // Revalidate identity with the Auth server before redirecting.
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) {
       setFormError("We couldn't verify your session. Please sign in again.");
@@ -326,7 +311,6 @@ export function LoginPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Sign in to manage your store and billing.
         </p>
-        {/* Persistent inline error region — reserved height to avoid layout shift. */}
         <div aria-live="polite" role="alert" className="mt-6 min-h-[2.5rem]">
           {formError ? (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -372,7 +356,6 @@ export function LoginPage() {
               <p className="text-xs text-destructive">{errors.password.message}</p>
             )}
           </div>
-          {/* Reserved slots: cooldown + resend banners — no layout shift. */}
           <div className="min-h-[2.5rem]">
             {cooldown > 0 && (
               <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">

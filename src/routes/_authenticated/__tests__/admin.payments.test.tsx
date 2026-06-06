@@ -49,7 +49,7 @@ const PENDING_PROOF = {
   created_at: new Date().toISOString(),
   tenants: { name: "Acme Goods", slug: "acme" },
   payment_methods: { label: "Vodafone Cash", kind: "wallet" },
-  subscriptions: { plans: { name: "Starter", interval: "monthly" } },
+  account_subscriptions: { plans: { name: "Starter", interval: "monthly" } },
 };
 
 function renderPage() {

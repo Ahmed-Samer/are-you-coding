@@ -41,13 +41,7 @@ import { createOrder, validatePromo } from "@/lib/catalog.functions";
 import { validateCartLines } from "@/lib/cart.functions";
 import { attachCartContact } from "@/lib/abandoned-carts.functions";
 import type { Availability } from "@/lib/availability";
-
-const DELIVERY_AREAS: { id: string; name: string; feeCents: number }[] = [
-  { id: "pickup", name: "Store pickup", feeCents: 0 },
-  { id: "zone1", name: "Nearby (≤5km)", feeCents: 3000 },
-  { id: "zone2", name: "City (5–15km)", feeCents: 5000 },
-  { id: "zone3", name: "Outer (>15km)", feeCents: 8000 },
-];
+import { ARAB_COUNTRIES } from "@/lib/countries";
 
 const checkoutSchema = z.object({
   name: z.string().trim().min(2, "Name is required").max(100),
@@ -58,7 +52,8 @@ const checkoutSchema = z.object({
     .refine((v) => isValidPhoneNumber(v), "Enter a valid phone number with country code"),
   address: z.string().trim().max(500).optional().or(z.literal("")),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
-  deliveryArea: z.string().min(1),
+  deliveryCountry: z.string().optional(),
+  deliveryState: z.string().optional(),
 });
 type CheckoutValues = z.infer<typeof checkoutSchema>;
 
@@ -70,10 +65,6 @@ type ConfirmationState = {
   deliveryFeeCents: number;
   totalCents: number;
   currency: string;
-  message: string;
-  whatsappUrl: string | null;
-  whatsappPhone: string | null;
-  popupBlocked: boolean;
 };
 
 function lastOrderKey(tenantId: string) {
@@ -89,6 +80,7 @@ export function CartDrawer({
   accent,
   tenantWhatsapp,
   availability,
+  shippingZones,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -98,6 +90,7 @@ export function CartDrawer({
   accent: string | null;
   tenantWhatsapp: string | null;
   availability?: Availability;
+  shippingZones?: any;
 }) {
   const cart = useCart();
   const handleIncrement = useCallback((lineKey: string, qty: number) => cart.setQty(lineKey, qty + 1), [cart]);
@@ -131,12 +124,42 @@ export function CartDrawer({
   const form = useForm<CheckoutValues>({
     resolver: zodResolver(checkoutSchema),
     mode: "onBlur",
-    defaultValues: { name: "", phone: "", address: "", notes: "", deliveryArea: "pickup" },
+    defaultValues: { name: "", phone: "", address: "", notes: "", deliveryCountry: "", deliveryState: "" },
   });
 
   const { register, handleSubmit, formState, watch, setValue, getValues } = form;
-  const deliveryArea = watch("deliveryArea");
-  const deliveryFee = DELIVERY_AREAS.find((a) => a.id === deliveryArea)?.feeCents ?? 0;
+  const deliveryCountry = watch("deliveryCountry");
+  const deliveryState = watch("deliveryState");
+
+  // Filter countries that are active in shippingZones
+  const activeCountries = useMemo(() => {
+    if (!shippingZones || Object.keys(shippingZones).length === 0) return [];
+    return ARAB_COUNTRIES.filter(c => shippingZones[c.id]?.active);
+  }, [shippingZones]);
+
+  const hasShipping = activeCountries.length > 0;
+
+  // For the selected country, find active states
+  const activeStates = useMemo(() => {
+    if (!deliveryCountry || !shippingZones || !shippingZones[deliveryCountry]?.active) return [];
+    const country = ARAB_COUNTRIES.find(c => c.id === deliveryCountry);
+    if (!country) return [];
+    return country.states.filter(s => shippingZones[deliveryCountry].states?.[s.id]?.active);
+  }, [deliveryCountry, shippingZones]);
+
+  // Compute fee and label
+  const deliveryFee = useMemo(() => {
+    if (!deliveryCountry || !deliveryState || !shippingZones) return 0;
+    return shippingZones[deliveryCountry]?.states?.[deliveryState]?.feeCents ?? 0;
+  }, [deliveryCountry, deliveryState, shippingZones]);
+
+  const deliveryAreaLabel = useMemo(() => {
+    if (!deliveryCountry || !deliveryState) return "";
+    const cName = ARAB_COUNTRIES.find(c => c.id === deliveryCountry)?.name.split(" ")[0] ?? "";
+    const sName = ARAB_COUNTRIES.find(c => c.id === deliveryCountry)?.states.find(s => s.id === deliveryState)?.name.split(" ")[0] ?? "";
+    return `${cName} - ${sName}`;
+  }, [deliveryCountry, deliveryState]);
+
   const discountCents = promo
     ? Math.min(promo.discountCents, cart.subtotalCents)
     : 0;
@@ -285,41 +308,8 @@ export function CartDrawer({
   const mut = useMutation({
     mutationFn: (input: any) => create({ data: input }),
     onSuccess: (res) => {
-      const values = getValues();
-      const phoneRaw = res.whatsappE164 ?? tenantWhatsapp ?? null;
-      const phone = phoneRaw && /^\+?\d{8,15}$/.test(phoneRaw) ? phoneRaw : null;
-
-      // Trust server totals — see file header.
       const finalDiscount = (res as any).discountCents ?? discountCents;
-      const finalPromoCode = (res as any).promoCode ?? promo?.code ?? null;
       const finalTotal = Math.max(0, res.subtotalCents - finalDiscount) + deliveryFee;
-
-      const msg = buildOrderMessage({
-        storeName: tenantName,
-        customerName: values.name,
-        phone: values.phone,
-        address: values.address ?? "",
-        notes: values.notes ?? "",
-        items: cart.items,
-        subtotalCents: res.subtotalCents,
-        deliveryFeeCents: deliveryFee,
-        deliveryAreaLabel: DELIVERY_AREAS.find((a) => a.id === deliveryArea)?.name ?? "",
-        totalCents: finalTotal,
-        currency: res.currency,
-        orderId: res.orderId,
-        promoCode: finalPromoCode,
-        discountCents: finalDiscount,
-      });
-      const whatsappUrl = phone
-        ? `https://wa.me/${phone.replace(/^\+/, "")}?text=${encodeURIComponent(msg)}`
-        : null;
-
-      // Attempt popup; fall through to fallback UI if blocked or missing.
-      let popupBlocked = false;
-      if (whatsappUrl) {
-        const handle = window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-        if (!handle) popupBlocked = true;
-      }
 
       const conf: ConfirmationState = {
         orderId: res.orderId,
@@ -329,10 +319,6 @@ export function CartDrawer({
         deliveryFeeCents: deliveryFee,
         totalCents: finalTotal,
         currency: res.currency,
-        message: msg,
-        whatsappUrl,
-        whatsappPhone: phone,
-        popupBlocked,
       };
       try {
         sessionStorage.setItem(lastOrderKey(tenantId), JSON.stringify(conf));
@@ -340,12 +326,8 @@ export function CartDrawer({
       setConfirmation(conf);
       setStage("confirmation");
       setConfirmSend(false);
-
-      if (!whatsappUrl) {
-        toast.error("This store hasn't set up WhatsApp. Copy the order details instead.");
-      } else if (popupBlocked) {
-        toast.error("Popup blocked — use the buttons below to open WhatsApp.");
-      }
+      
+      toast.success("Order placed successfully!");
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to place order"),
   });
@@ -370,6 +352,8 @@ export function CartDrawer({
       promoCode: promo?.code ?? null,
       sessionId: cart.sessionId || null,
       recoveryToken: cart.recoveryToken,
+      deliveryAreaLabel: hasShipping ? deliveryAreaLabel : null,
+      deliveryFeeCents: hasShipping ? deliveryFee : null,
     });
     setConfirmSend(false);
   }
@@ -381,7 +365,17 @@ export function CartDrawer({
     const ok = await revalidateOrAbort();
     if (ok) setStage("checkout");
   }
-  const onReviewSubmit = handleSubmit(async () => {
+  const onReviewSubmit = handleSubmit(async (data) => {
+    if (hasShipping) {
+      if (!data.deliveryCountry) {
+        form.setError("deliveryCountry", { type: "manual", message: "Country is required" });
+        return;
+      }
+      if (!data.deliveryState) {
+        form.setError("deliveryState", { type: "manual", message: "State is required" });
+        return;
+      }
+    }
     const ok = await revalidateOrAbort();
     if (ok) setStage("review");
   });
@@ -518,19 +512,39 @@ export function CartDrawer({
                 <Label htmlFor="cd-address">Delivery address</Label>
                 <Textarea id="cd-address" rows={3} autoComplete="street-address" {...register("address")} />
               </div>
-              <div>
-                <Label>Delivery area</Label>
-                <Select value={deliveryArea} onValueChange={(v) => setValue("deliveryArea", v, { shouldDirty: true })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {DELIVERY_AREAS.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name} — {a.feeCents === 0 ? "Free" : formatPrice(a.feeCents, currency)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {hasShipping && (
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <Label>Country</Label>
+                    <Select value={deliveryCountry} onValueChange={(v) => { setValue("deliveryCountry", v, { shouldDirty: true }); setValue("deliveryState", "", { shouldDirty: true }); }}>
+                      <SelectTrigger className={formState.errors.deliveryCountry ? "border-destructive" : ""}><SelectValue placeholder="Select Country" /></SelectTrigger>
+                      <SelectContent>
+                        {activeCountries.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name.split(" ")[0]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {formState.errors.deliveryCountry && <p className="mt-1 text-xs text-destructive">{formState.errors.deliveryCountry.message}</p>}
+                  </div>
+                  <div className="flex-1">
+                    <Label>State / Region</Label>
+                    <Select value={deliveryState} onValueChange={(v) => setValue("deliveryState", v, { shouldDirty: true })} disabled={!deliveryCountry}>
+                      <SelectTrigger className={formState.errors.deliveryState ? "border-destructive" : ""}><SelectValue placeholder="Select State" /></SelectTrigger>
+                      <SelectContent>
+                        {activeStates.map((s) => {
+                          const fee = shippingZones[deliveryCountry!]?.states?.[s.id]?.feeCents ?? 0;
+                          return (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name.split(" ")[0]} — {fee === 0 ? "Free" : formatPrice(fee, currency)}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {formState.errors.deliveryState && <p className="mt-1 text-xs text-destructive">{formState.errors.deliveryState.message}</p>}
+                  </div>
+                </div>
+              )}
               <div>
                 <Label htmlFor="cd-notes">Notes (optional)</Label>
                 <Textarea id="cd-notes" rows={2} {...register("notes")} />
@@ -610,7 +624,9 @@ export function CartDrawer({
                     <Row label={`Promo — ${promo.code}`} value={`− ${formatPrice(discountCents, currency)}`} />
                   )}
                 </div>
-                <Row label={`Delivery — ${DELIVERY_AREAS.find((a) => a.id === deliveryArea)?.name}`} value={deliveryFee === 0 ? "Free" : formatPrice(deliveryFee, currency)} />
+                {hasShipping && (
+                  <Row label={`Delivery — ${deliveryAreaLabel}`} value={deliveryFee === 0 ? "Free" : formatPrice(deliveryFee, currency)} />
+                )}
                 <div className="pt-1.5 mt-1.5 border-t border-border flex items-center justify-between">
                   <span className="font-medium">Total</span>
                   <span className="font-semibold tabular-nums">{formatPrice(totalCents, currency)}</span>
@@ -629,7 +645,7 @@ export function CartDrawer({
               </div>
               <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground flex items-start gap-2">
                 <Check className="size-3.5 mt-0.5 flex-shrink-0" />
-                <span>You'll be handed off to WhatsApp to confirm with the store. Your order will be saved here either way.</span>
+                <span>Your order will be sent securely to {tenantName}. You can review it below.</span>
               </div>
             </div>
             <SheetFooter className="mt-4 flex-col gap-2 sm:flex-col">
@@ -644,7 +660,7 @@ export function CartDrawer({
                 onClick={() => setConfirmSend(true)}
                 disabled={mut.isPending || (availability ? !availability.isOpen : false)}
               >
-                {mut.isPending ? "Sending…" : "Send order via WhatsApp"}
+                {mut.isPending ? "Sending…" : "Place order"}
               </Button>
               <Button variant="ghost" className="w-full" onClick={() => setStage("checkout")}>
                 <X className="size-4 mr-1" /> Edit details
@@ -654,9 +670,9 @@ export function CartDrawer({
             <ConfirmDialog
               open={confirmSend}
               onOpenChange={setConfirmSend}
-              title="Send this order?"
-              description={`Total ${formatPrice(totalCents, currency)} — we'll open WhatsApp so you can confirm with ${tenantName}.`}
-              confirmLabel="Send via WhatsApp"
+              title="Place this order?"
+              description={`Total ${formatPrice(totalCents, currency)} — please confirm to send it to ${tenantName}.`}
+              confirmLabel="Place Order"
               loading={mut.isPending}
               onConfirm={actuallySubmit}
             />
@@ -676,82 +692,16 @@ export function CartDrawer({
                   </div>
                 </div>
 
-                {/* WhatsApp handoff — anchor (popup-block immune) + fallback. */}
-                <div className="rounded-md border border-border p-3 space-y-2">
-                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Send to {tenantName} via WhatsApp
-                  </div>
-                  {confirmation.whatsappUrl ? (
-                    <>
-                      <a
-                        href={confirmation.whatsappUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-white"
-                        style={accentStyle ?? { background: "#25D366" }}
-                      >
-                        Open WhatsApp <ArrowRight className="size-4" />
-                      </a>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copyText(confirmation.whatsappUrl!, "Link copied")}
-                        >
-                          <Copy className="size-3.5 mr-1.5" /> Copy link
-                        </Button>
-                        {confirmation.whatsappPhone && (
-                          <a
-                            href={`tel:${confirmation.whatsappPhone}`}
-                            className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
-                          >
-                            <Phone className="size-3.5 mr-1.5" /> {confirmation.whatsappPhone}
-                          </a>
-                        )}
-                      </div>
-                      {confirmation.popupBlocked && (
-                        <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                          Your browser blocked the popup. Use the buttons above.
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">
-                        This store hasn't set up WhatsApp yet. Copy the order details and send them by your preferred channel.
-                      </p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => copyText(confirmation.message, "Order details copied")}
-                      >
-                        <Copy className="size-3.5 mr-1.5" /> Copy order details
-                      </Button>
-                    </div>
-                  )}
+                <div className="rounded-md border border-border p-4 text-center mt-6">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    We've received your order and will contact you shortly to confirm the details.
+                  </p>
+                  <Button className="w-full min-h-11" onClick={backToShopping} style={accentStyle}>
+                    Continue Shopping
+                  </Button>
                 </div>
-
-                <details className="rounded-md border border-border p-3 text-xs">
-                  <summary className="cursor-pointer font-medium">Order summary</summary>
-                  <pre className="mt-2 whitespace-pre-wrap break-words font-sans text-[11px] text-muted-foreground">
-                    {confirmation.message}
-                  </pre>
-                </details>
               </div>
               <SheetFooter className="mt-4 flex-col gap-2 sm:flex-col">
-                <Button className="w-full min-h-11" onClick={backToShopping} style={accentStyle}>
-                  Back to shopping
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => copyText(confirmation.message, "Order details copied")}
-                >
-                  <Copy className="size-4 mr-1" /> Copy order summary
-                </Button>
               </SheetFooter>
             </>
           )

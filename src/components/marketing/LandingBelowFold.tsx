@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/accordion";
 import { SectionHeader } from "./LandingPage";
 import { ResultsBand } from "./ResultsBand";
+import { STATIC_PLANS, TIER_ORDER } from "@/lib/pricing-static";
 
 export function LandingBelowFold() {
   return (
@@ -223,14 +224,23 @@ function Testimonials() {
 /* ─────────────────────── Pricing ─────────────────────── */
 type Billing = "monthly" | "quarterly";
 
-const PRICING_PLANS = [
-  { name: "Starter", blurb: "For new shops launching their first online store.", monthly: 15, quarterly: 12, slug: "starter", features: ["Up to 50 products","Free subdomain","WhatsApp ordering","Email support"], highlighted: false },
-  { name: "Growth", blurb: "For shops with a growing catalog and traffic.", monthly: 39, quarterly: 31, slug: "growth", features: ["Unlimited products","Custom domain","Order analytics","Priority support"], highlighted: true },
-  { name: "Scale", blurb: "For established brands with multiple locations.", monthly: 89, quarterly: 71, slug: "scale", features: ["Everything in Growth","Multi-staff access","Advanced reporting","Onboarding manager"], highlighted: false },
-];
-
 function Pricing() {
   const [billing, setBilling] = useState<Billing>("monthly");
+
+  const plansData = TIER_ORDER.map((tier) => {
+    const monthlyPlan = STATIC_PLANS.find((p) => p.name === tier && p.interval === "monthly")!;
+    const quarterlyPlan = STATIC_PLANS.find((p) => p.name === tier && p.interval === "quarterly")!;
+    return {
+      name: tier,
+      blurb: monthlyPlan.description,
+      monthly: monthlyPlan.price_usd,
+      quarterly: quarterlyPlan.price_usd,
+      slug: monthlyPlan.slug.replace("-monthly", ""),
+      features: monthlyPlan.features,
+      highlighted: monthlyPlan.highlight,
+    };
+  });
+
   return (
     <section className="border-b border-border">
       <div className="mx-auto max-w-7xl px-6 py-20 sm:py-24">
@@ -271,7 +281,7 @@ function Pricing() {
           </div>
         </div>
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
-          {PRICING_PLANS.map((p) => {
+          {plansData.map((p) => {
             const price = billing === "monthly" ? p.monthly : p.quarterly;
             return (
               <div
