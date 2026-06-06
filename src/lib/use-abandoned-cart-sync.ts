@@ -92,5 +92,10 @@ export function useAbandonedCartSync({
     promoCode,
     tenantId,
     sync,
+    // `cart.setRecoveryCartId` is a stable React useState setter so omitting
+    // it from deps is safe. Listing the parent `cart` object would re-run
+    // this effect on every cart mutation (the context value is re-memoized)
+    // even when the persisted payload hash has not actually changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   ]);
 }
