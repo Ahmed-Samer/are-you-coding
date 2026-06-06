@@ -92,6 +92,5 @@ export function useAbandonedCartSync({
     promoCode,
     tenantId,
     sync,
-    cart,
   ]);
 }

@@ -2,7 +2,7 @@
  * Cart state + abandoned-cart session lifecycle.
  *
  *   1. CREATE  — `getCartSessionId(tenantId)` mints a UUID on first mount
- *                and persists to `localStorage` under `cart-session:<tid>`.
+ *                and persists to `localStorage` under `cart:session:<tid>`.
  *                Cart items persist under `cart:<tid>`.
  *   2. SYNC    — `useAbandonedCartSync` debounces 1.5s after any cart
  *                mutation, gated on `sessionId !== ""` and `!hydrating`.
@@ -125,7 +125,16 @@ export function CartProvider({ tenantId, children }: { tenantId: string; childre
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(storageKey, JSON.stringify(items));
+    // Wrapped: Safari/iOS private mode has a 0-byte quota and throws
+    // `QuotaExceededError` on the very first write. Letting the exception
+    // escape this effect crashes the entire storefront. Silently degrading
+    // to in-memory state is the correct behaviour in private mode — items
+    // survive within the session, they just don't persist across reloads.
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(items));
+    } catch {
+      /* storage unavailable (private mode / quota) — keep in-memory only */
+    }
   }, [items, storageKey]);
 
   const value = useMemo<CartState>(() => ({
