@@ -4,18 +4,16 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Check, Copy, Clock, Upload, X, AlertTriangle, ArrowLeft, Mail } from "lucide-react";
+import { Check, Copy, Clock, AlertTriangle, ArrowLeft, Mail } from "lucide-react";
 import { PlatformShell } from "@/components/shells/PlatformShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
 import {
   getCheckoutContext,
   listPaymentMethods,
   getCurrentFxRate,
-  submitPaymentProof,
   cancelPendingSubscription,
   supersedePendingProof,
   resendBankInstructionsEmail,
