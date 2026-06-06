@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, useSearch, Link, Navigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -76,7 +76,9 @@ export function OnboardingPage() {
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState<StepId>("plan");
-  const [interval, setInterval] = useState<"monthly" | "quarterly">("monthly");
+  // Named `billingInterval` (not `interval`) so we never shadow the global
+  // `setInterval`/`clearInterval` timer functions inside this file.
+  const [billingInterval, setBillingInterval] = useState<"monthly" | "quarterly">("monthly");
   const [planSlug, setPlanSlug] = useState<string>(prefilledPlan ?? "");
   const [busy, setBusy] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
@@ -99,8 +101,8 @@ export function OnboardingPage() {
   }>;
 
   const filteredPlans = useMemo(
-    () => plans.filter((p) => p.interval === interval),
-    [plans, interval],
+    () => plans.filter((p) => p.interval === billingInterval),
+    [plans, billingInterval],
   );
 
   const selectedPlan = plans.find((p) => p.slug === planSlug);
@@ -117,20 +119,20 @@ export function OnboardingPage() {
     const match = plans.find((p) => p.slug === prefilledPlan);
     deepLinkResolved.current = true;
     if (!match) return;
-    setInterval(match.interval === "quarterly" ? "quarterly" : "monthly");
+    setBillingInterval(match.interval === "quarterly" ? "quarterly" : "monthly");
     setPlanSlug(match.slug);
   }, [prefilledPlan, plansData, plans]);
 
   const switchInterval = useCallback(
     (next: "monthly" | "quarterly") => {
-      if (interval === next) return;
-      setInterval(next);
+      if (billingInterval === next) return;
+      setBillingInterval(next);
       const current = plans.find((p) => p.slug === planSlug);
       if (current?.interval !== next) {
         setPlanSlug("");
       }
     },
-    [interval, planSlug, plans],
+    [billingInterval, planSlug, plans],
   );
 
   const onCreate = async () => {
@@ -147,7 +149,7 @@ export function OnboardingPage() {
       const subRes = await createAccountSubFn({
         data: {
           planSlug,
-          interval,
+          interval: billingInterval,
         },
       });
 
@@ -211,6 +213,16 @@ export function OnboardingPage() {
     }
   };
 
+  // If user already has an active subscription, redirect to dashboard.
+  // Done in an effect (not via `<Navigate />` during render) so React
+  // StrictMode dev double-renders don't enqueue two navigations.
+  useEffect(() => {
+    if (accountSubLoading) return;
+    if (accountSubStatus === "active") {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [accountSubLoading, accountSubStatus, navigate]);
+
   if (accountSubLoading) {
     return (
       <PlatformShell>
@@ -222,9 +234,18 @@ export function OnboardingPage() {
     );
   }
 
-  // If user already has subscription, redirect to dashboard
+  // Active-subscription redirect is handled in the effect above. Render a
+  // lightweight placeholder while the navigation flushes so we never paint
+  // the wizard for a paying user.
   if (hasActiveSubscription) {
-    return <Navigate to="/dashboard" />;
+    return (
+      <PlatformShell>
+        <div className="mx-auto max-w-3xl px-6 py-20 flex flex-col items-center gap-4">
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Redirecting to your dashboard…</p>
+        </div>
+      </PlatformShell>
+    );
   }
 
   // If user has a pending subscription, show an interstitial instead of the
@@ -338,11 +359,11 @@ export function OnboardingPage() {
                       <button
                         key={i}
                         type="button"
-                        aria-pressed={interval === i}
+                        aria-pressed={billingInterval === i}
                         onClick={() => switchInterval(i)}
                         className={
                           "px-3 py-1.5 rounded-sm transition-colors " +
-                          (interval === i
+                          (billingInterval === i
                             ? "bg-foreground text-background"
                             : "text-muted-foreground hover:text-foreground")
                         }
@@ -372,7 +393,7 @@ export function OnboardingPage() {
                 </div>
               ) : filteredPlans.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground text-center">
-                  No plans available for {intervalLabel(interval).toLowerCase()} billing.
+                  No plans available for {intervalLabel(billingInterval).toLowerCase()} billing.
                 </div>
               ) : (
                 <div className="grid sm:grid-cols-2 gap-3" role="radiogroup">
