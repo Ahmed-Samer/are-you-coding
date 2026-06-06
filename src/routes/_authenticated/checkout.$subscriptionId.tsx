@@ -499,6 +499,19 @@ export function CheckoutPage() {
   };
 
   const onCancelCheckout = async () => {
+    // Guard: server enforces pending-only cancellation, but fail fast on the
+    // client too so we never even attempt to cancel an active subscription
+    // from a stale route.
+    const currentStatus = sub?.status as string | undefined;
+    if (currentStatus !== "pending_payment" && currentStatus !== "pending_review") {
+      toast.error(
+        currentStatus === "active"
+          ? "This subscription is active — it cannot be cancelled from checkout."
+          : "Only pending checkouts can be cancelled.",
+      );
+      setConfirmCancel(false);
+      return;
+    }
     setCancelling(true);
     try {
       await cancelSub({ data: { subscriptionId } });
