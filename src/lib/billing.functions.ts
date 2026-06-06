@@ -828,24 +828,25 @@ export const cancelPendingSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ subscriptionId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { data: sub, error: sErr } = await (supabaseAdmin as any)
-      .from("account_subscriptions" as any)
-      .select("id, status, user_id")
-      .eq("id", data.subscriptionId)
-      .single();
-    if (sErr || !sub) throw new Error("Subscription not found");
-    if (sub.user_id !== context.userId) throw new Error("Forbidden");
-    
-    if (sub.status !== "pending_payment" && (sub.status as string) !== "pending_review") {
-      throw new Error("Only pending checkouts can be cancelled.");
-    }
-
-    const { error } = await (supabaseAdmin as any)
+    // Atomic, status-scoped cancel. The status filter is part of the WHERE
+    // clause itself so we can never accidentally cancel an `active` row even
+    // if the caller passes a stale/wrong id. Ownership is enforced the same
+    // way. We rely on the row count to detect "nothing matched".
+    const { data: rows, error } = await (supabaseAdmin as any)
       .from("account_subscriptions" as any)
       .update({ status: "cancelled" })
-      .eq("id", data.subscriptionId);
+      .eq("id", data.subscriptionId)
+      .eq("user_id", context.userId)
+      .in("status", ["pending_payment", "pending_review"])
+      .select("id");
     if (error) throw new Error(error.message);
-    return { ok: true };
+    const cancelled = Array.isArray(rows) ? rows.length : 0;
+    if (cancelled === 0) {
+      throw new Error(
+        "Only pending checkouts can be cancelled. This subscription is no longer pending or does not belong to you.",
+      );
+    }
+    return { ok: true, cancelled };
   });
 
 // ---------- SUPERSEDE pending proof (edit/resend) ----------
