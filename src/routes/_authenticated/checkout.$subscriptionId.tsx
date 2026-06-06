@@ -165,7 +165,6 @@ export function CheckoutPage() {
   const fetchCheckout = useServerFn(getCheckoutContext);
   const fetchMethods = useServerFn(listPaymentMethods);
   const fetchFx = useServerFn(getCurrentFxRate);
-  const submit = useServerFn(submitPaymentProof);
   const cancelSub = useServerFn(cancelPendingSubscription);
   const supersede = useServerFn(supersedePendingProof);
   const resendEmail = useServerFn(resendBankInstructionsEmail);
@@ -588,21 +587,6 @@ export function CheckoutPage() {
           onConfirm={onCancelCheckout}
         />
 
-        <ConfirmDialog
-          open={confirmSubmit}
-          onOpenChange={setConfirmSubmit}
-          title="Submit this proof for review?"
-          description={
-            `Method: ${selectedMethod?.label ?? "—"} · Reference: ${reference || "—"} · ` +
-            `Amount: ${egpLabel}` +
-            (file ? " · Screenshot attached" : " · No screenshot attached") +
-            ". Make sure your reference matches what your bank or wallet shows."
-          }
-          confirmLabel={busy ? "Submitting…" : "Submit proof"}
-          loading={busy}
-          onConfirm={() => { void onSubmitProof(); }}
-        />
-
 
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8 items-start">
           <div className="rounded-lg border border-border bg-card p-6">
@@ -887,7 +871,6 @@ export function CheckoutPage() {
                   toast.success("Proof submitted — we'll review within 24 hours.");
                   setReference("");
                   setNotes("");
-                  setFile(null);
                   goTo("pending");
                 }}
               />
