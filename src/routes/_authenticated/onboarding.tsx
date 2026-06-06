@@ -15,7 +15,13 @@ import {
 import { PlatformShell } from "@/components/shells/PlatformShell";
 import { Button } from "@/components/ui/button";
 import { Stepper } from "@/components/ui/stepper";
-import { listPlans, createAccountSubscription, getMyAccountSubscription, cancelPendingSubscription } from "@/lib/billing.functions";
+import {
+  listPlans,
+  createAccountSubscription,
+  getMyAccountSubscription,
+  getMyPendingSubscription,
+  cancelPendingSubscription,
+} from "@/lib/billing.functions";
 import { formatPlanPrice, intervalLabel } from "@/lib/format-price";
 import { quarterlySavingsPct } from "@/lib/pricing-static";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
@@ -66,6 +72,7 @@ export function OnboardingPage() {
 
   const createAccountSubFn = useServerFn(createAccountSubscription);
   const cancelSubFn = useServerFn(cancelPendingSubscription);
+  const pendingSubFn = useServerFn(getMyPendingSubscription);
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState<StepId>("plan");
@@ -178,10 +185,19 @@ export function OnboardingPage() {
   };
 
   const onCancelPending = async () => {
-    if (!accountSub?.id) return;
     setBusy(true);
     try {
-      await cancelSubFn({ data: { subscriptionId: accountSub.id } });
+      // CRITICAL: do NOT trust accountSub.id — it is the latest row regardless
+      // of status and can resolve to an active subscription under race. Always
+      // fetch the pending-only id fresh, right before the cancel call.
+      const { subscription: pendingSub } = await pendingSubFn();
+      if (!pendingSub?.id) {
+        toast.info("No pending checkout to cancel.");
+        await queryClient.invalidateQueries({ queryKey: ["my-account-subscription"] });
+        setConfirmCancelPending(false);
+        return;
+      }
+      await cancelSubFn({ data: { subscriptionId: pendingSub.id } });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["my-account-subscription"] }),
         queryClient.invalidateQueries({ queryKey: ["my-tenants"] }),
