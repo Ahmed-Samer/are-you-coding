@@ -451,7 +451,7 @@ export function OnboardingPage() {
               )}
               <dl className="divide-y divide-border rounded-md border border-border">
                 {[
-                  { k: "Billing", v: intervalLabel(interval) },
+                  { k: "Billing", v: intervalLabel(billingInterval) },
                   { k: "Plan", v: selectedPlan ? `${selectedPlan.name} · ${formatPlanPrice(selectedPlan)}` : "—" },
                 ].map(({ k, v }) => (
                   <div key={k} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
