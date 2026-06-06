@@ -7,9 +7,6 @@ import { z } from "zod";
 import { Check, Copy, Clock, AlertTriangle, ArrowLeft, Mail } from "lucide-react";
 import { PlatformShell } from "@/components/shells/PlatformShell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   getCheckoutContext,
   listPaymentMethods,
@@ -113,6 +110,14 @@ function CopyButton({
 }
 
 function ManualCopyField({ value, label }: { value: string; label: string }) {
+  // SSR/Worker-safe OS detection. `navigator.platform` is deprecated and
+  // already returns frozen / empty strings in some browsers; fall back to
+  // userAgent, and to "Ctrl" by default if neither is available.
+  const isMac = (() => {
+    if (typeof navigator === "undefined") return false;
+    const src = (navigator.userAgent || (navigator as any).platform || "").toLowerCase();
+    return src.includes("mac");
+  })();
   return (
     <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
       <div className="text-amber-700 dark:text-amber-400 font-medium">{label}</div>
@@ -124,7 +129,7 @@ function ManualCopyField({ value, label }: { value: string; label: string }) {
         className="mt-1 w-full bg-transparent font-mono text-foreground outline-none"
       />
       <p className="mt-1 text-[11px] text-muted-foreground">
-        Tap or click to select, then press {navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl"}-C to copy.
+        Tap or click to select, then press {isMac ? "⌘" : "Ctrl"}-C to copy.
       </p>
     </div>
   );
@@ -224,15 +229,10 @@ export function CheckoutPage() {
   const [methodId, setMethodId] = useState<string>("");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const lastStatusRef = useRef<string | null>(null);
   const lastProofStatusRef = useRef<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [confirmSubmit, setConfirmSubmit] = useState(false);
   const autoRoutedRef = useRef(false);
   const [resendingEmail, setResendingEmail] = useState(false);
   const [cooldownSec, setCooldownSec] = useState(0);
@@ -256,7 +256,10 @@ export function CheckoutPage() {
       latestProof?.status === "rejected"
     ) {
       toast.error("Your payment proof was rejected", { description: "Please review your details and resubmit." });
-      setStep("proof");
+      // Only auto-jump to the proof step if the user is sitting on the
+      // pending screen. From any other step (e.g. instructions while
+      // editing a typo'd reference) we leave them where they are.
+      setStep((current) => (current === "pending" ? "proof" : current));
     }
     lastStatusRef.current = sub.status;
     lastProofStatusRef.current = latestProof?.status ?? null;
@@ -338,11 +341,9 @@ export function CheckoutPage() {
     return () => window.clearInterval(id);
   }, [instructionsEmailLastSentAt]);
 
-  useEffect(() => {
-    const onFocus = () => { void refetchCheckout(); };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [refetchCheckout]);
+  // Note: window-focus refetch is already enabled by TanStack Query's
+  // default `refetchOnWindowFocus: true`. A manual listener here would
+  // duplicate every refetch.
 
   if (isLoading) {
     return (
@@ -394,58 +395,14 @@ export function CheckoutPage() {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Note: the proof submission path lives entirely inside `<UploadProofStep />`
+  // (signed-URL direct upload + server-side magic-byte MIME sniff). The
+  // legacy `onSubmitProof` + direct `supabase.storage.upload` path that used
+  // to live here was removed during the Screen 21 audit because it bypassed
+  // the safety net and was no longer reachable from the UI.
+  // ---------------------------------------------------------------------------
   const goTo = (next: StepId) => setStep(next);
-
-  const onSubmitProof = async () => {
-    if (!methodId) {
-      toast.error("Pick a payment method");
-      return;
-    }
-    setBusy(true);
-    try {
-      let screenshotPath: string | undefined;
-      if (file) {
-        setUploading(true);
-        const { data: userData } = await supabase.auth.getUser();
-        const uid = userData.user?.id;
-        if (!uid) throw new Error("Not signed in");
-        const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
-        const path = `${uid}/${subscriptionId}/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from("payment-proofs")
-          .upload(path, file, { upsert: false, contentType: file.type });
-        if (upErr) throw new Error(upErr.message);
-        screenshotPath = path;
-        setUploading(false);
-      }
-      await submit({
-        data: {
-          subscriptionId,
-          paymentMethodId: methodId,
-          referenceNumber: reference.trim(),
-          screenshotPath,
-          notes: notes || undefined,
-        },
-      });
-      toast.success("Proof submitted — we'll review within 24 hours.");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["checkout", subscriptionId] }),
-        queryClient.invalidateQueries({ queryKey: ["my-tenants"] }),
-        queryClient.invalidateQueries({ queryKey: ["my-tenants-stats"] }),
-        queryClient.invalidateQueries({ queryKey: ["my-account-subscription"] }),
-      ]);
-      setFile(null);
-      setReference("");
-      setNotes("");
-      goTo("pending");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not submit proof");
-    } finally {
-      setUploading(false);
-      setBusy(false);
-      setConfirmSubmit(false);
-    }
-  };
 
   const copy = async (text: string): Promise<boolean> => {
     try {
